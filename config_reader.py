@@ -5,10 +5,11 @@ from pydantic import SecretStr
 
 
 class Settings(BaseSettings):
-    api_base_url: str
-    bot_token: SecretStr
-    database_url: str
-    admin_telegram_ids: Set[int]
+    API_BASE_URL: str
+    BOT_API_TOKEN: SecretStr
+    DATABASE_URL: str
+    ADMIN_TELEGRAM_IDS: Set[int]
+    DEFAULT_CLIENT_MESSAGE: str
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

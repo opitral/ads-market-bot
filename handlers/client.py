@@ -1,5 +1,7 @@
 from aiogram.types import Message, ReplyKeyboardRemove
 
+from config_reader import config
 
-async def client_default_handler(message: Message):
-    await message.answer("Свяжитесь с @parlament_er для получения доступа", reply_markup=ReplyKeyboardRemove())
+
+async def default_client_handler(message: Message):
+    await message.answer(config.DEFAULT_CLIENT_MESSAGE, reply_markup=ReplyKeyboardRemove())

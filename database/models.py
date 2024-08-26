@@ -17,7 +17,7 @@ class Base(DeclarativeBase):
 
 
 class User(Base):
-    __tablename__ = 'users'
+    __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     telegram_id: Mapped[str] = mapped_column(nullable=False)

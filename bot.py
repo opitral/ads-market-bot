@@ -21,7 +21,7 @@ async def on_startup(bot: Bot) -> None:
 
     await create_db()
 
-    for admin_telegram_id in config.admin_telegram_ids:
+    for admin_telegram_id in config.ADMIN_TELEGRAM_IDS:
         await bot.send_message(admin_telegram_id, "Бот запущен")
 
 
@@ -42,7 +42,7 @@ async def main():
     logger = logging.getLogger()
     logger.addHandler(file_handler)
 
-    bot = Bot(token=config.bot_token.get_secret_value())
+    bot = Bot(token=config.BOT_API_TOKEN.get_secret_value())
     dp = Dispatcher()
 
     dp.startup.register(on_startup)

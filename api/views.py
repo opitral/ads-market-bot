@@ -5,8 +5,8 @@ class SubjectView:
 
     def to_dict(self):
         return {
-            'id': self.id,
-            'name': self.name
+            "id": self.id,
+            "name": self.name
         }
 
 
@@ -18,8 +18,8 @@ class CityView:
 
     def to_dict(self):
         return {
-            'id': self.id,
-            'city': self.city,
+            "id": self.id,
+            "city": self.city,
         }
 
 
@@ -30,8 +30,8 @@ class UserView:
 
     def to_dict(self):
         return {
-            'id': self.id,
-            'telegramId': self.telegram_id
+            "id": self.id,
+            "telegramId": self.telegram_id
         }
 
 
@@ -42,8 +42,8 @@ class PriceView:
 
     def to_dict(self):
         return {
-            'withPin': self.with_pin,
-            'withoutPin': self.without_pin
+            "withPin": self.with_pin,
+            "withoutPin": self.without_pin
         }
 
 
@@ -67,19 +67,19 @@ class GroupView:
 
     def to_dict(self):
         return {
-            'id': self.id,
-            'name': self.name,
-            'groupTelegramId': self.group_telegram_id,
-            'userTelegramId': self.user_telegram_id,
-            'cityId': self.city_id,
-            'workingHoursStart': self.working_hours_start,
-            'workingHoursEnd': self.working_hours_end,
-            'postIntervalInMinutes': self.post_interval_in_minutes,
-            'link': self.link,
-            'priceForOneDay': self.price_for_one_day,
-            'priceForOneWeek': self.price_for_one_week,
-            'priceForTwoWeeks': self.price_for_two_weeks,
-            'priceForOneMonth': self.price_for_one_month
+            "id": self.id,
+            "name": self.name,
+            "groupTelegramId": self.group_telegram_id,
+            "userTelegramId": self.user_telegram_id,
+            "cityId": self.city_id,
+            "workingHoursStart": self.working_hours_start,
+            "workingHoursEnd": self.working_hours_end,
+            "postIntervalInMinutes": self.post_interval_in_minutes,
+            "link": self.link,
+            "priceForOneDay": self.price_for_one_day,
+            "priceForOneWeek": self.price_for_one_week,
+            "priceForTwoWeeks": self.price_for_two_weeks,
+            "priceForOneMonth": self.price_for_one_month
         }
 
 
@@ -90,8 +90,8 @@ class ButtonView:
 
     def to_dict(self):
         return {
-            'text': self.text,
-            'url': self.url
+            "text": self.text,
+            "url": self.url
         }
 
 
@@ -104,10 +104,10 @@ class PublicationView:
 
     def to_dict(self):
         return {
-            'type': self.type,
-            'fileId': self.file_id,
-            'text': self.text,
-            'button': self.button
+            "type": self.type,
+            "fileId": self.file_id,
+            "text": self.text,
+            "button": self.button
         }
 
 
@@ -121,9 +121,9 @@ class PostView:
 
     def to_dict(self):
         return {
-            'id': self.id,
-            'publication': self.publication,
-            'groupId': self.group_id,
-            'publishDate': self.publish_date,
-            'publishTime': self.publish_time
+            "id": self.id,
+            "publication": self.publication,
+            "groupId": self.group_id,
+            "publishDate": self.publish_date,
+            "publishTime": self.publish_time
         }

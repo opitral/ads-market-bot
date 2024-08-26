@@ -14,7 +14,7 @@ class ChatTypeFilter(BaseFilter):
 
 class IsAdminFilter(BaseFilter):
     def __init__(self) -> None:
-        self.admin_ids = config.admin_telegram_ids
+        self.admin_ids = config.ADMIN_TELEGRAM_IDS
 
     async def __call__(self, message: Message) -> bool:
         return message.from_user.id in self.admin_ids

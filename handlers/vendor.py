@@ -8,7 +8,7 @@ from api.views import UserView
 from database.orm_queries import is_vendor, find_user_by_telegram_id, add_user
 from filters.chat_type import ChatTypeFilter
 from api.client import ApiClient
-from handlers.client import client_default_handler
+from handlers.client import default_client_handler
 from keyboards.vendor import main_kb
 
 router = Router()
@@ -24,7 +24,7 @@ async def command_start_handler(message: Message, session: AsyncSession):
         api.create(Endpoint.USER, UserView(str(message.chat.id)).to_dict())
 
     if not await is_vendor(session, str(message.chat.id)):
-        return await client_default_handler(message)
+        return await default_client_handler(message)
 
     await message.answer("👋 Здравствуйте", reply_markup=main_kb())
 
@@ -32,7 +32,7 @@ async def command_start_handler(message: Message, session: AsyncSession):
 @router.message(F.text.lower().contains("добавить группу"))
 async def add_group_handler(message: Message, session: AsyncSession):
     if not await is_vendor(session, str(message.chat.id)):
-        return await client_default_handler(message)
+        return await default_client_handler(message)
 
     await message.answer("⚙️ В разработке")
 
@@ -40,7 +40,7 @@ async def add_group_handler(message: Message, session: AsyncSession):
 @router.message(F.text.lower().contains("мои группы"))
 async def my_groups_handler(message: Message, session: AsyncSession):
     if not await is_vendor(session, str(message.chat.id)):
-        return await client_default_handler(message)
+        return await default_client_handler(message)
 
     await message.answer("⚙️ В разработке")
 
@@ -48,7 +48,7 @@ async def my_groups_handler(message: Message, session: AsyncSession):
 @router.message(F.text.lower().contains("создать объявление"))
 async def create_post_handler(message: Message, session: AsyncSession):
     if not await is_vendor(session, str(message.chat.id)):
-        return await client_default_handler(message)
+        return await default_client_handler(message)
 
     await message.answer("⚙️ В разработке")
 
@@ -56,7 +56,7 @@ async def create_post_handler(message: Message, session: AsyncSession):
 @router.message(F.text.lower().contains("статистика"))
 async def statistic_handler(message: Message, session: AsyncSession):
     if not await is_vendor(session, str(message.chat.id)):
-        return await client_default_handler(message)
+        return await default_client_handler(message)
 
     await message.answer("⚙️ В разработке")
 
@@ -64,6 +64,6 @@ async def statistic_handler(message: Message, session: AsyncSession):
 @router.message()
 async def unknown_handler(message: Message, session: AsyncSession):
     if not await is_vendor(session, str(message.chat.id)):
-        return await client_default_handler(message)
+        return await default_client_handler(message)
 
     await message.answer("Неизвестная команда")
