@@ -118,11 +118,84 @@ class SubjectNameChangeCbData(CallbackData, prefix="subject_name_change"):
     subject_id: int
 
 
+class SubjectDeleteCbData(CallbackData, prefix="subject_delete"):
+    subject_id: int
+
+
+class SubjectsCbData(CallbackData, prefix="subjects"):
+    pass
+
+
 def subject_kb(subject_id: int) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
 
-    kb.button(text="Изменить название", callback_data=SubjectNameChangeCbData(subject_id=subject_id).pack())
     kb.button(text="Города", callback_data=CitiesCbData(subject_id=subject_id).pack())
+    kb.button(text="Изменить название", callback_data=SubjectNameChangeCbData(subject_id=subject_id).pack())
+    kb.button(text="Удалить", callback_data=SubjectDeleteCbData(subject_id=subject_id).pack())
+    kb.button(text="Назад", callback_data=SubjectsCbData().pack())
 
     kb.adjust(1)
     return kb.as_markup()
+
+
+def cancel_kb() -> ReplyKeyboardMarkup:
+    kb = ReplyKeyboardBuilder()
+    kb.button(text="Отменить")
+    return kb.as_markup(resize_keyboard=True)
+
+
+class CityCbData(CallbackData, prefix="city"):
+    city_id: int
+    subject_id: int
+
+
+def all_cities_kb(cities: List[dict]) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    for city in cities:
+        kb.row(InlineKeyboardButton(text=city.get("name"), callback_data=CityCbData(city_id=city.get("id"), subject_id=city.get("subjectId")).pack()))
+    return kb.as_markup()
+
+
+class CityNameChangeCbData(CallbackData, prefix="city_name_change"):
+    city_id: int
+
+
+class CityDeleteCbData(CallbackData, prefix="city_delete"):
+    city_id: int
+
+
+def city_kb(city_id: int, subject_id: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.button(text="Изменить название", callback_data=CityNameChangeCbData(city_id=city_id).pack())
+    kb.button(text="Удалить", callback_data=CityDeleteCbData(city_id=city_id).pack())
+    kb.button(text="Назад", callback_data=SubjectCbData(subject_id=subject_id))
+    kb.adjust(1)
+    return kb.as_markup()
+
+
+def subjects_and_cities_kb() -> ReplyKeyboardMarkup:
+    kb = ReplyKeyboardBuilder()
+    kb.button(text="Добавить направление")
+    kb.button(text="Добавить город")
+    kb.button(text="Вернуться в админку")
+
+    kb.adjust(2)
+    return kb.as_markup(resize_keyboard=True)
+
+
+class CitySubjectCdData(CallbackData, prefix="city_subject"):
+    subject_id: int
+
+
+def create_city_kb(subjects: List[dict]) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    for subject in subjects:
+        kb.row(InlineKeyboardButton(text=subject.get("name"), callback_data=CitySubjectCdData(subject_id=subject.get("id")).pack()))
+
+    return kb.as_markup()
+
+
+def back_kb() -> ReplyKeyboardMarkup:
+    kb = ReplyKeyboardBuilder()
+    kb.button(text="Назад")
+    return kb.as_markup(resize_keyboard=True)

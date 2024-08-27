@@ -5,6 +5,8 @@ from aiogram import F, Router
 from aiogram.enums import ParseMode
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import Command
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,7 +19,10 @@ from database.models import Role, User
 from database.orm_queries import find_user_by_telegram_id, add_user, find_all_users, find_user_by_id, \
     set_user_allowed_groups_count, set_user_role
 from keyboards.admin import main_kb, administration_kb, all_users_kb, PaginationCbData, UserInfoCbData, \
-    user_settings_kb, UserAllowedChatsChangeCbData, UserRoleChangeCbData, all_subjects_kb, SubjectCbData, subject_kb
+    user_settings_kb, UserAllowedChatsChangeCbData, UserRoleChangeCbData, all_subjects_kb, SubjectCbData, subject_kb, \
+    SubjectNameChangeCbData, cancel_kb, CitiesCbData, all_cities_kb, SubjectDeleteCbData, CityCbData, city_kb, \
+    CityNameChangeCbData, subjects_and_cities_kb, SubjectsCbData, CityDeleteCbData, create_city_kb, CitySubjectCdData, \
+    back_kb
 
 from filters.chat_type import ChatTypeFilter, IsAdminFilter
 
@@ -37,6 +42,7 @@ async def command_start_handler(message: Message, session: AsyncSession):
 
 
 @router.message(F.text.lower().contains("админка"))
+@router.message(F.text.lower().contains("вернуться в админку"))
 async def admin_panel_handler(message: Message):
     await message.answer("Административаная панель", reply_markup=administration_kb())
 
@@ -167,10 +173,11 @@ async def subjects_handler(message: Message, session: AsyncSession):
     response = client.get_all(Endpoint.SUBJECT)
     subjects = response.get("responseList")
     if subjects:
+        await message.answer("Направления и города", reply_markup=subjects_and_cities_kb())
         await message.answer(f"Всего направлений: {len(subjects)}", reply_markup=all_subjects_kb(subjects))
 
     else:
-        await message.answer("Направления не найдены")
+        await message.answer("Направления не найдены", reply_markup=subjects_and_cities_kb())
 
 
 @router.callback_query(SubjectCbData.filter())
@@ -180,9 +187,272 @@ async def subject_info_handler(callback: CallbackQuery, callback_data: SubjectCb
     try:
         response = client.get_by_id(Endpoint.SUBJECT, callback_data.subject_id)
         await callback.message.edit_text(
-            text=f"{response.get('id')}. {response.get('name')}",
+            text=f"Направление: {response.get('name')}",
             reply_markup=subject_kb(response.get('id'))
         )
 
     except NoSuchEntityException as ex:
         await callback.answer(ex.message)
+
+
+class SetSubjectName(StatesGroup):
+    setting_new_subject_name = State()
+
+
+@router.callback_query(SubjectNameChangeCbData.filter())
+async def change_subject_name_handler(callback: CallbackQuery, callback_data: SubjectNameChangeCbData,
+                                      state: FSMContext):
+    await callback.message.answer(f"Отправьте мне новое название направления", reply_markup=cancel_kb())
+    await state.set_state(SetSubjectName.setting_new_subject_name)
+    await state.update_data(subject_id=callback_data.subject_id)
+
+
+@router.message(SetSubjectName.setting_new_subject_name, F.text.lower().contains("отменить"))
+async def change_subject_name_cancel_handler(message: Message, state: FSMContext):
+    await message.answer(text="Действие отменено", reply_markup=subjects_and_cities_kb())
+    await state.clear()
+
+
+@router.message(SetSubjectName.setting_new_subject_name, F.text)
+async def set_subject_name_handler(message: Message, session: AsyncSession, state: FSMContext):
+    await state.update_data(new_subject_name=message.text)
+    data = await state.get_data()
+
+    found_user = await find_user_by_telegram_id(session, str(message.chat.id))
+    client = ApiClient(found_user)
+    try:
+        client.update(Endpoint.SUBJECT, {
+            "id": data["subject_id"],
+            "name": data["new_subject_name"],
+        })
+
+        await subjects_handler(message, session)
+        await message.answer("Новое название направления установлено", reply_markup=subjects_and_cities_kb())
+        await state.clear()
+
+    except Exception as ex:
+        await message.answer(str(ex))
+
+
+@router.message(SetSubjectName.setting_new_subject_name)
+async def set_subject_name_unknown_handler(message: Message):
+    await message.answer("Отправьте мне текстовое сообщение")
+
+
+@router.callback_query(CitiesCbData.filter())
+async def subject_cities_handler(callback: CallbackQuery, callback_data: CitiesCbData, session: AsyncSession):
+    found_user = await find_user_by_telegram_id(session, str(callback.message.chat.id))
+    client = ApiClient(found_user)
+    try:
+        response = client.get_all(Endpoint.CITY, {
+            "subjectId": callback_data.subject_id,
+        })
+        cities = response.get("responseList")
+        if not cities:
+            return await callback.answer("Города не найдены")
+
+        await callback.message.edit_text(text=callback.message.text, reply_markup=all_cities_kb(cities))
+
+    except Exception as ex:
+        await callback.answer(str(ex))
+
+
+@router.callback_query(CityCbData.filter())
+async def subject_city_handler(callback: CallbackQuery, callback_data: CityCbData, session: AsyncSession):
+    found_user = await find_user_by_telegram_id(session, str(callback.message.chat.id))
+    client = ApiClient(found_user)
+    try:
+        response = client.get_by_id(Endpoint.CITY, callback_data.city_id)
+        await callback.message.edit_text(
+            text=callback.message.text + f"\nГород: {response.get('name')}",
+            reply_markup=city_kb(response.get('id'), callback_data.subject_id)
+        )
+
+    except Exception as ex:
+        await callback.answer(str(ex))
+
+
+@router.callback_query(SubjectDeleteCbData.filter())
+async def subject_delete_handler(callback: CallbackQuery, callback_data: SubjectDeleteCbData, session: AsyncSession):
+    found_user = await find_user_by_telegram_id(session, str(callback.message.chat.id))
+    client = ApiClient(found_user)
+    try:
+        client.delete(Endpoint.SUBJECT, callback_data.subject_id)
+        await subjects_handler(callback.message, session)
+        await callback.answer("Успешно")
+        await callback.message.delete()
+
+    except Exception as ex:
+        await callback.answer(str(ex))
+
+
+class SetCityName(StatesGroup):
+    setting_new_city_name = State()
+
+
+@router.callback_query(CityNameChangeCbData.filter())
+async def change_city_name_handler(callback: CallbackQuery, callback_data: CityNameChangeCbData, state: FSMContext):
+    await callback.message.answer(f"Отправьте мне новое название города", reply_markup=cancel_kb())
+    await state.set_state(SetCityName.setting_new_city_name)
+    await state.update_data(city_id=callback_data.city_id)
+
+
+@router.message(SetCityName.setting_new_city_name, F.text.lower().contains("отменить"))
+async def change_city_name_cancel_handler(message: Message, session: AsyncSession, state: FSMContext):
+    await subjects_handler(message, session)
+    await message.answer(text="Действие отменено")
+    await state.clear()
+
+
+@router.message(SetCityName.setting_new_city_name, F.text)
+async def set_city_name_handler(message: Message, session: AsyncSession, state: FSMContext):
+    await state.update_data(new_city_name=message.text)
+    data = await state.get_data()
+
+    found_user = await find_user_by_telegram_id(session, str(message.chat.id))
+    client = ApiClient(found_user)
+    try:
+        client.update(Endpoint.CITY, {
+            "id": data["city_id"],
+            "name": data["new_city_name"],
+        })
+
+        await subjects_handler(message, session)
+        await message.answer("Новое название города установлено")
+        await state.clear()
+
+    except Exception as ex:
+        await message.answer(str(ex))
+
+
+@router.message(SetCityName.setting_new_city_name)
+async def set_city_name_unknown_handler(message: Message):
+    await message.answer("Отправьте мне текстовое сообщение")
+
+
+@router.callback_query(SubjectsCbData.filter())
+async def all_subjects_cd_handler(callback: CallbackQuery, session: AsyncSession):
+    found_user = await find_user_by_telegram_id(session, str(callback.message.chat.id))
+    client = ApiClient(found_user)
+    response = client.get_all(Endpoint.SUBJECT)
+    subjects = response.get("responseList")
+    if subjects:
+        await callback.message.answer("Направления и города", reply_markup=subjects_and_cities_kb())
+        await callback.message.answer(f"Всего направлений: {len(subjects)}", reply_markup=all_subjects_kb(subjects))
+
+    else:
+        await callback.message.answer("Направления не найдены")
+
+
+@router.callback_query(CityDeleteCbData.filter())
+async def city_delete_handler(callback: CallbackQuery, callback_data: CityDeleteCbData, session: AsyncSession):
+    found_user = await find_user_by_telegram_id(session, str(callback.message.chat.id))
+    client = ApiClient(found_user)
+    try:
+        client.delete(Endpoint.CITY, callback_data.city_id)
+        await subjects_handler(callback.message, session)
+        await callback.answer("Успешно")
+        await callback.message.delete()
+
+    except Exception as ex:
+        await callback.answer(str(ex))
+
+
+class NewSubject(StatesGroup):
+    setting_subject_name = State()
+
+
+@router.message(F.text.lower().contains("добавить направление"))
+async def add_subject_handler(message: Message, state: FSMContext):
+    await message.answer(f"Отправьте мне название направления", reply_markup=cancel_kb())
+    await state.set_state(NewSubject.setting_subject_name)
+
+
+@router.message(NewSubject.setting_subject_name, F.text.lower().contains("отменить"))
+async def add_subject_cancel_handler(message: Message, session: AsyncSession, state: FSMContext):
+    await subjects_handler(message, session)
+    await message.answer(text="Действие отменено")
+    await state.clear()
+
+
+@router.message(NewSubject.setting_subject_name, F.text)
+async def create_subject_handler(message: Message, session: AsyncSession, state: FSMContext):
+    await state.update_data(new_subject_name=message.text)
+    data = await state.get_data()
+
+    found_user = await find_user_by_telegram_id(session, str(message.chat.id))
+    client = ApiClient(found_user)
+    try:
+        client.create(Endpoint.SUBJECT, {
+            "name": data["new_subject_name"],
+        })
+
+        await subjects_handler(message, session)
+        await message.answer("Новое направление создано")
+        await state.clear()
+
+    except Exception as ex:
+        await message.answer(str(ex))
+
+
+@router.message(NewSubject.setting_subject_name)
+async def add_subject_unknown_handler(message: Message):
+    await message.answer("Отправьте мне текстовое сообщение")
+
+
+class NewCity(StatesGroup):
+    setting_city_subject_id = State()
+    setting_city_name = State()
+
+
+@router.message(F.text.lower().contains("добавить город"))
+@router.message(NewCity.setting_city_name, F.text.lower().contains("назад"))
+async def add_city_handler(message: Message, session: AsyncSession, state: FSMContext):
+    found_user = await find_user_by_telegram_id(session, str(message.chat.id))
+    client = ApiClient(found_user)
+    try:
+        response = client.get_all(Endpoint.SUBJECT)
+        subjects = response.get("responseList")
+        if not subjects:
+            return message.answer("У вас нету добавленных направлений")
+
+        await message.answer("Добавить город", reply_markup=cancel_kb())
+        await message.answer("Выберите направление", reply_markup=create_city_kb(subjects))
+        await state.set_state(NewCity.setting_city_subject_id)
+
+    except Exception as ex:
+        await message.answer(str(ex))
+
+
+@router.callback_query(NewCity.setting_city_subject_id, CitySubjectCdData.filter())
+async def set_new_city_subject_id_handler(callback: CallbackQuery, callback_data: CitySubjectCdData, state: FSMContext):
+    await state.update_data(new_city_subject_id=callback_data.subject_id)
+    await callback.message.answer("Отправьте мне название города", reply_markup=back_kb())
+    await state.set_state(NewCity.setting_city_name)
+
+
+@router.message(NewCity.setting_city_subject_id, F.text.lower().contains("отменить"))
+async def add_city_subject_id_cancel_handler(message: Message, session: AsyncSession, state: FSMContext):
+    await subjects_handler(message, session)
+    await message.answer(text="Действие отменено")
+    await state.clear()
+
+
+@router.message(NewCity.setting_city_name, F.text)
+async def create_city_handler(message: Message, session: AsyncSession, state: FSMContext):
+    await state.update_data(new_city_name=message.text)
+    data = await state.get_data()
+    found_user = await find_user_by_telegram_id(session, str(message.chat.id))
+    client = ApiClient(found_user)
+    try:
+        client.create(Endpoint.CITY, {
+            "subjectId": data["new_city_subject_id"],
+            "name": data["new_city_name"]
+        })
+
+        await subjects_handler(message, session)
+        await message.answer("Новый город создан")
+        await state.clear()
+
+    except Exception as ex:
+        await message.answer(str(ex))

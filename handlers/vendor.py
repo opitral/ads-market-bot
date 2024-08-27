@@ -66,9 +66,14 @@ async def unknown_handler(message: Message, session: AsyncSession):
     if not await is_vendor(session, str(message.chat.id)):
         return await default_client_handler(message)
 
-    await message.answer("Неизвестная команда")
+    await message.answer("Неизвестная команда", reply_markup=main_kb())
 
 
 @router.callback_query()
 async def unknown_callback(callback: CallbackQuery):
     await callback.answer()
+
+
+@router.message()
+async def unknown_handler(message: Message):
+    await message.answer("Неизвестная команда")
