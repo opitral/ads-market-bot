@@ -1,6 +1,6 @@
 from aiogram import Router, F
 from aiogram.filters import Command
-from aiogram.types import Message
+from aiogram.types import Message, CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.enums import Endpoint
@@ -67,3 +67,8 @@ async def unknown_handler(message: Message, session: AsyncSession):
         return await default_client_handler(message)
 
     await message.answer("Неизвестная команда")
+
+
+@router.callback_query()
+async def unknown_callback(callback: CallbackQuery):
+    await callback.answer()

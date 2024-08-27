@@ -26,7 +26,7 @@ async def on_startup(bot: Bot) -> None:
 
 
 async def on_shutdown(bot: Bot) -> None:
-    for admin_telegram_id in config.admin_telegram_ids:
+    for admin_telegram_id in config.ADMIN_TELEGRAM_IDS:
         await bot.send_message(admin_telegram_id, "Бот остановлен")
 
 
