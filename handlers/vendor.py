@@ -56,6 +56,11 @@ async def add_group_handler(message: Message, session: AsyncSession, state: FSMC
         return await default_client_handler(message)
 
     found_user = await find_user_by_telegram_id(session, str(message.chat.id))
+
+    if found_user.allowed_groups_count >= len(found_user.groups):
+        return await message.answer("Лимит на добавление групп исчерпан, "
+                                    "свяжитесь с @parlament_er для увеличения лимита")
+
     client = ApiClient(found_user)
     try:
         response = client.get_all(Endpoint.SUBJECT)
@@ -205,7 +210,8 @@ async def create_group_handler(message: Message, session: AsyncSession, state: F
             price_for_two_weeks=price_list[2],
             price_for_one_month=price_list[3]
         ).to_dict())
-        await message.answer("Группа добавлена, теперь добавьте бота в эту группу и сделайте администратором", reply_markup=main_kb_by_role(message))
+        await message.answer("Группа добавлена, теперь добавьте бота в эту группу и сделайте администратором",
+                             reply_markup=main_kb_by_role(message))
         await state.clear()
 
     except Exception as ex:

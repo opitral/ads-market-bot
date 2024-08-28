@@ -2,19 +2,20 @@ from typing import List
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from database.models import User, Role, Group
 
 
 async def find_user_by_telegram_id(session: AsyncSession, telegram_id: str) -> User:
-    query = select(User).where(User.telegram_id == telegram_id)
+    query = select(User).options(selectinload(User.groups)).where(User.telegram_id == telegram_id)
     result = await session.execute(query)
     found_user = result.scalars().first()
     return found_user
 
 
 async def find_user_by_id(session: AsyncSession, user_id: int) -> User:
-    query = select(User).where(User.id == user_id)
+    query = select(User).options(selectinload(User.groups)).where(User.id == user_id)
     result = await session.execute(query)
     found_user = result.scalars().first()
     return found_user
