@@ -1,8 +1,8 @@
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import String, DateTime, Enum as SQLAlchemyEnum, Integer
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import String, DateTime, Enum as SQLAlchemyEnum, Integer, ForeignKey
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 class Role(Enum):
@@ -26,3 +26,13 @@ class User(Base):
     last_name: Mapped[str] = mapped_column(String(255), nullable=True)
     role: Mapped[Role] = mapped_column(SQLAlchemyEnum(Role), nullable=False, default=Role.CLIENT)
     allowed_groups_count: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+    groups: Mapped[list["Group"]] = relationship("Group", back_populates="user")
+
+
+class Group(Base):
+    __tablename__ = "groups"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    telegram_id: Mapped[str] = mapped_column(nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    user: Mapped["User"] = relationship("User", back_populates="groups")

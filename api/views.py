@@ -36,9 +36,9 @@ class UserView:
 
 
 class PriceView:
-    def __init__(self, with_pin, without_pin):
-        self.with_pin = with_pin
+    def __init__(self, without_pin, with_pin):
         self.without_pin = without_pin
+        self.with_pin = with_pin
 
     def to_dict(self):
         return {
@@ -48,8 +48,10 @@ class PriceView:
 
 
 class GroupView:
-    def __init__(self, name, group_telegram_id, user_telegram_id, city_id, price_for_one_day, price_for_one_week,
-                 price_for_two_weeks, price_for_one_month, working_hours_start=0, working_hours_end=24,
+    def __init__(self, name, group_telegram_id, user_telegram_id, city_id, price_for_one_day: PriceView,
+                 price_for_one_week: PriceView,
+                 price_for_two_weeks: PriceView, price_for_one_month: PriceView,
+                 working_hours_start="00:00", working_hours_end="24:00",
                  post_interval_in_minutes=60, link=None, _id=None):
         self.id = _id
         self.name = name
@@ -60,10 +62,10 @@ class GroupView:
         self.working_hours_end = working_hours_end
         self.post_interval_in_minutes = post_interval_in_minutes
         self.link = link
-        self.price_for_one_day = price_for_one_day
-        self.price_for_one_week = price_for_one_week
-        self.price_for_two_weeks = price_for_two_weeks
-        self.price_for_one_month = price_for_one_month
+        self.price_for_one_day = price_for_one_day.to_dict()
+        self.price_for_one_week = price_for_one_week.to_dict()
+        self.price_for_two_weeks = price_for_two_weeks.to_dict()
+        self.price_for_one_month = price_for_one_month.to_dict()
 
     def to_dict(self):
         return {

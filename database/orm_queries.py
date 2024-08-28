@@ -3,7 +3,7 @@ from typing import List
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from database.models import User, Role
+from database.models import User, Role, Group
 
 
 async def find_user_by_telegram_id(session: AsyncSession, telegram_id: str) -> User:
@@ -51,3 +51,14 @@ async def set_user_role(session: AsyncSession, user: User, role: Role) -> User:
     user.role = role
     await session.commit()
     return user
+
+
+async def add_group(session: AsyncSession, user_id: int, telegram_id: str) -> Group:
+    group = Group(
+        user_id=user_id,
+        telegram_id=telegram_id
+    )
+
+    session.add(group)
+    await session.commit()
+    return group
