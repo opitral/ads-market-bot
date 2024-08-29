@@ -102,7 +102,8 @@ class GroupDeleteCbData(CallbackData, prefix="group_delete"):
 def group_kb(group_id: int) -> InlineKeyboardMarkup:
     kb = InlineKeyboardBuilder()
     kb.row(InlineKeyboardButton(text="Время работы", callback_data=GroupWorkTimesCbData(group_id=group_id).pack()))
-    kb.row(InlineKeyboardButton(text="Интервал публикаций", callback_data=GroupPostsIntervalCbData(group_id=group_id).pack()))
+    kb.row(InlineKeyboardButton(text="Интервал публикаций",
+                                callback_data=GroupPostsIntervalCbData(group_id=group_id).pack()))
     kb.row(InlineKeyboardButton(text="Прайс лист", callback_data=GroupPriceListCbData(group_id=group_id).pack()))
     kb.row(InlineKeyboardButton(text="Удалить", callback_data=GroupDeleteCbData(group_id=group_id).pack()))
     return kb.as_markup()

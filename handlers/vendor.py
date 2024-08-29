@@ -643,7 +643,8 @@ async def group_delete_handler(callback: CallbackQuery, callback_data: GroupDele
 
 
 @router.callback_query(GroupDeleteSubmitCbData.filter())
-async def group_delete_submit_handler(callback: CallbackQuery, callback_data: GroupDeleteSubmitCbData, session: AsyncSession):
+async def group_delete_submit_handler(callback: CallbackQuery, callback_data: GroupDeleteSubmitCbData,
+                                      session: AsyncSession):
     if not await is_vendor(session, str(callback.message.chat.id)):
         return await default_client_handler(callback.message)
 
@@ -651,7 +652,8 @@ async def group_delete_submit_handler(callback: CallbackQuery, callback_data: Gr
     client = ApiClient(found_user)
     try:
         group = client.get_by_id(Endpoint.GROUP, callback_data.group_id)
-        group_local = await get_group_by_telegram_id_and_user_telegram_id(session, group.get("groupTelegramId"), str(callback.message.chat.id))
+        group_local = await get_group_by_telegram_id_and_user_telegram_id(session, group.get("groupTelegramId"),
+                                                                          str(callback.message.chat.id))
         await delete_group(session, group_local)
         client.delete(Endpoint.GROUP, callback_data.group_id)
         await callback.message.edit_text(f"Группа <b>{group.get('name')}</b> удалена", parse_mode=ParseMode.HTML)

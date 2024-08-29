@@ -75,7 +75,8 @@ async def get_user_groups(session: AsyncSession, user_id: int) -> List[Group]:
     return list(found_groups)
 
 
-async def get_group_by_telegram_id_and_user_telegram_id(session: AsyncSession, group_telegram_id: str, user_telegram_id: str) -> Group:
+async def get_group_by_telegram_id_and_user_telegram_id(session: AsyncSession, group_telegram_id: str,
+                                                        user_telegram_id: str) -> Group:
     user = await find_user_by_telegram_id(session, user_telegram_id)
     query = select(Group).where(Group.telegram_id == group_telegram_id, Group.user_id == user.id)
     result = await session.execute(query)
