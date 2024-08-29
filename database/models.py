@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import String, DateTime, Enum as SQLAlchemyEnum, Integer, ForeignKey
+from sqlalchemy import String, DateTime, Enum as SQLAlchemyEnum, Integer, ForeignKey, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -36,3 +36,14 @@ class Group(Base):
     telegram_id: Mapped[str] = mapped_column(nullable=False)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     user: Mapped["User"] = relationship("User", back_populates="groups")
+    city_id: Mapped[int] = mapped_column(nullable=False)
+    subject_id: Mapped[int] = mapped_column(nullable=False)
+    messages: Mapped[list["Message"]] = relationship("Message", back_populates="group", cascade="all, delete-orphan")
+
+
+class Message(Base):
+    __tablename__ = "messages"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), nullable=False)
+    group: Mapped["Group"] = relationship("Group", back_populates="messages")

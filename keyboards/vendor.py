@@ -69,3 +69,55 @@ def group_choose_kb() -> ReplyKeyboardMarkup:
     kb.button(text="Назад")
     kb.adjust(1)
     return kb.as_markup(resize_keyboard=True)
+
+
+class GroupCbData(CallbackData, prefix="user_group"):
+    group_id: int
+
+
+def all_groups_kb(groups: List[dict]) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    for group in groups:
+        kb.row(InlineKeyboardButton(text=group.get("name"), callback_data=GroupCbData(group_id=group.get("id")).pack()))
+
+    return kb.as_markup()
+
+
+class GroupWorkTimesCbData(CallbackData, prefix="group_work_times"):
+    group_id: int
+
+
+class GroupPostsIntervalCbData(CallbackData, prefix="group_posts_interval"):
+    group_id: int
+
+
+class GroupPriceListCbData(CallbackData, prefix="group_price_list"):
+    group_id: int
+
+
+class GroupDeleteCbData(CallbackData, prefix="group_delete"):
+    group_id: int
+
+
+def group_kb(group_id: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.row(InlineKeyboardButton(text="Время работы", callback_data=GroupWorkTimesCbData(group_id=group_id).pack()))
+    kb.row(InlineKeyboardButton(text="Интервал публикаций", callback_data=GroupPostsIntervalCbData(group_id=group_id).pack()))
+    kb.row(InlineKeyboardButton(text="Прайс лист", callback_data=GroupPriceListCbData(group_id=group_id).pack()))
+    kb.row(InlineKeyboardButton(text="Удалить", callback_data=GroupDeleteCbData(group_id=group_id).pack()))
+    return kb.as_markup()
+
+
+class GroupDeleteSubmitCbData(CallbackData, prefix="group_submit_delete"):
+    group_id: int
+
+
+class GroupDeleteCancelCbData(CallbackData, prefix="group_cancel_delete"):
+    group_id: int
+
+
+def submit_delete_kb(group_id: int) -> InlineKeyboardMarkup:
+    kb = InlineKeyboardBuilder()
+    kb.row(InlineKeyboardButton(text="Подтвердить", callback_data=GroupDeleteSubmitCbData(group_id=group_id).pack()),
+           InlineKeyboardButton(text="Отменить", callback_data=GroupDeleteCancelCbData(group_id=group_id).pack()))
+    return kb.as_markup()

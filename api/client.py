@@ -21,7 +21,7 @@ class ApiClient:
         vendor_permissions = {
             Endpoint.SUBJECT: [Method.GET],
             Endpoint.CITY: [Method.GET],
-            Endpoint.GROUP: [Method.GET, Method.POST],
+            Endpoint.GROUP: [Method.GET, Method.POST, Method.PUT, Method.DELETE],
             Endpoint.USER: [Method.POST],
             Endpoint.POST: [Method.POST],
         }

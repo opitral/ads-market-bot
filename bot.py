@@ -6,7 +6,7 @@ from aiogram import Bot, Dispatcher
 
 from config_reader import config
 from database.engine import drop_db, create_db, session_maker
-from handlers import admin, vendor
+from handlers import admin, vendor, group
 from middlewares.db import DatabaseSessionMiddleware
 
 
@@ -52,6 +52,7 @@ async def main():
 
     dp.include_router(admin.router)
     dp.include_router(vendor.router)
+    dp.include_router(group.router)
 
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)

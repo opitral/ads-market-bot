@@ -42,8 +42,8 @@ class PriceView:
 
     def to_dict(self):
         return {
-            "withPin": self.with_pin,
-            "withoutPin": self.without_pin
+            "withoutPin": self.without_pin,
+            "withPin": self.with_pin
         }
 
 
