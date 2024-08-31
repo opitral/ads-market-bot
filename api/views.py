@@ -109,7 +109,8 @@ class ButtonView:
 
 
 class PublicationView:
-    def __init__(self, publication_type: PublicationType, file_id: int = None, text: str = None, button: ButtonView = None):
+    def __init__(self, publication_type: PublicationType, file_id: int = None, text: str = None,
+                 button: ButtonView = None):
         self.publication_type = publication_type
         self.file_id = file_id
         self.text = text

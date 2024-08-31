@@ -241,8 +241,8 @@ async def create_group_handler(message: Message, session: AsyncSession, state: F
                 raise
 
             prices = day_details[1].split("/")
-            price_without_pin = prices[0]
-            price_with_pin = prices[1]
+            price_without_pin = int(prices[0])
+            price_with_pin = int(prices[1])
             price_list.append(PriceView(price_without_pin, price_with_pin))
             index += 1
 
@@ -260,7 +260,7 @@ async def create_group_handler(message: Message, session: AsyncSession, state: F
             name=data.get("group_name"),
             link=data.get("group_link"),
             group_telegram_id=data.get("group_telegram_id"),
-            user_telegram_id=message.chat.id,
+            user_telegram_id=str(message.chat.id),
             price_for_one_day=price_list[0],
             price_for_one_week=price_list[1],
             price_for_two_weeks=price_list[2],
@@ -606,8 +606,8 @@ async def set_group_price_list_handler(message: Message, session: AsyncSession, 
                 raise
 
             prices = day_details[1].split("/")
-            price_without_pin = prices[0]
-            price_with_pin = prices[1]
+            price_without_pin = int(prices[0])
+            price_with_pin = int(prices[1])
             price_list.append(PriceView(price_without_pin, price_with_pin))
             index += 1
 
@@ -987,7 +987,8 @@ async def create_post_skip_handler(message: Message, session: AsyncSession, stat
 
     posts = []
     for post in post_info.get("posts"):
-        posts.append(f"{post['date'].strftime('%m-%d')} {post['time'].strftime('%H:%M')}({'с закрепом' if post['with_pin'] else 'без закрепа'})")
+        posts.append(f"{post['date'].strftime('%m-%d')} {post['time'].strftime('%H:%M')}"
+                     f"({'с закрепом' if post['with_pin'] else 'без закрепа'})")
 
     await message.answer(text=f"Группа: {group.get('name')}\n"
                               f"Cтоимость: {post_info.get('total_price')}\n"
