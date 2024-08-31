@@ -1,8 +1,10 @@
 from typing import List
 
 from aiogram.filters.callback_data import CallbackData
-from aiogram.types import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButtonRequestChat
+from aiogram.types import ReplyKeyboardMarkup, InlineKeyboardMarkup, InlineKeyboardButton, KeyboardButtonRequestChat, WebAppInfo
 from aiogram.utils.keyboard import ReplyKeyboardBuilder, InlineKeyboardBuilder
+
+from config_reader import config
 
 
 def main_kb() -> ReplyKeyboardMarkup:
@@ -122,3 +124,38 @@ def submit_delete_kb(group_id: int) -> InlineKeyboardMarkup:
     kb.row(InlineKeyboardButton(text="Подтвердить", callback_data=GroupDeleteSubmitCbData(group_id=group_id).pack()),
            InlineKeyboardButton(text="Отменить", callback_data=GroupDeleteCancelCbData(group_id=group_id).pack()))
     return kb.as_markup()
+
+
+def calendar_kb(group_id: int) -> ReplyKeyboardMarkup:
+    kb = ReplyKeyboardBuilder()
+
+    web_app_info = WebAppInfo(url=f"{config.CALENDAR_URL}?id={group_id}")
+    kb.button(text="Календарь", web_app=web_app_info)
+    kb.button(text="Назад")
+
+    kb.adjust(1)
+    return kb.as_markup(resize_keyboard=True)
+
+
+def skip_kb() -> ReplyKeyboardMarkup:
+    kb = ReplyKeyboardBuilder()
+    kb.button(text="Пропустить")
+    kb.button(text="Назад")
+    kb.adjust(1)
+    return kb.as_markup(resize_keyboard=True)
+
+
+def publication_kb(button) -> InlineKeyboardMarkup:
+    if button.get("text"):
+        kb = InlineKeyboardBuilder()
+        kb.row(InlineKeyboardButton(text=button.get("text"), url=button.get("url")))
+        return kb.as_markup()
+
+
+def submit_post_kb() -> ReplyKeyboardMarkup:
+    kb = ReplyKeyboardBuilder()
+    kb.button(text="Подтвердить")
+    kb.button(text="Отменить")
+    kb.button(text="Назад")
+    kb.adjust(2)
+    return kb.as_markup(resize_keyboard=True)

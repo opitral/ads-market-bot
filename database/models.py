@@ -36,9 +36,10 @@ class Group(Base):
     telegram_id: Mapped[str] = mapped_column(nullable=False)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
     user: Mapped["User"] = relationship("User", back_populates="groups")
-    city_id: Mapped[int] = mapped_column(nullable=False)
-    subject_id: Mapped[int] = mapped_column(nullable=False)
+    city_id: Mapped[int] = mapped_column(Integer, nullable=False)
+    subject_id: Mapped[int] = mapped_column(Integer, nullable=False)
     messages: Mapped[list["Message"]] = relationship("Message", back_populates="group", cascade="all, delete-orphan")
+    posts: Mapped[list["Post"]] = relationship("Post", back_populates="group", cascade="all, delete-orphan")
 
 
 class Message(Base):
@@ -47,3 +48,12 @@ class Message(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), nullable=False)
     group: Mapped["Group"] = relationship("Group", back_populates="messages")
+
+
+class Post(Base):
+    __tablename__ = "posts"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    group_id: Mapped[int] = mapped_column(ForeignKey("groups.id"), nullable=False)
+    group: Mapped["Group"] = relationship("Group", back_populates="posts")
+    total_price: Mapped[int] = mapped_column(Integer, nullable=False)

@@ -1,7 +1,9 @@
+import json
 from datetime import datetime
+from urllib.parse import urlparse
 
 from aiogram import Router, F
-from aiogram.enums import ParseMode
+from aiogram.enums import ParseMode, ContentType
 from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
@@ -10,17 +12,18 @@ from aiogram.types import Message, CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.client import ApiClient
-from api.enums import Endpoint
-from api.views import UserView, PriceView, GroupView
+from api.enums import Endpoint, PublicationType
+from api.views import UserView, PriceView, GroupView, PostView, PublicationView, ButtonView
 from config_reader import config
 from database.orm_queries import is_vendor, find_user_by_telegram_id, add_user, add_group, get_user_groups, \
-    get_group_by_telegram_id_and_user_telegram_id, delete_group, get_messages_count_last_7_days
+    get_group_by_telegram_id_and_user_telegram_id, delete_group, get_messages_count_last_7_days, add_post
 from filters.chat_type import ChatTypeFilter
 from handlers.client import default_client_handler
 from keyboards.admin import main_kb as admin_main_kb
 from keyboards.vendor import main_kb, subjects_kb, SubjectCbData, cities_kb, back_kb, CityCbData, \
     group_choose_kb, all_groups_kb, GroupCbData, group_kb, GroupWorkTimesCbData, GroupPostsIntervalCbData, \
-    GroupPriceListCbData, GroupDeleteCbData, submit_delete_kb, GroupDeleteSubmitCbData, GroupDeleteCancelCbData
+    GroupPriceListCbData, GroupDeleteCbData, submit_delete_kb, GroupDeleteSubmitCbData, GroupDeleteCancelCbData, \
+    calendar_kb, skip_kb, publication_kb, submit_post_kb
 
 router = Router()
 router.message.filter(ChatTypeFilter(is_group=False))
@@ -72,6 +75,16 @@ class GroupPriceList(StatesGroup):
     price_list = State()
 
 
+class CreatePost(StatesGroup):
+    subject = State()
+    city = State()
+    group = State()
+    calendar = State()
+    post = State()
+    button = State()
+    submit = State()
+
+
 @router.message(F.text.lower().contains("добавить группу"))
 @router.message(AddGroup.city, F.text.lower().contains("назад"))
 async def add_group_handler(message: Message, session: AsyncSession, state: FSMContext):
@@ -106,6 +119,8 @@ async def add_group_handler(message: Message, session: AsyncSession, state: FSMC
 @router.message(GroupWorkTimes.work_times, F.text.lower().contains("назад"))
 @router.message(GroupPostsInterval.interval, F.text.lower().contains("назад"))
 @router.message(GroupPriceList.price_list, F.text.lower().contains("назад"))
+@router.message(CreatePost.subject, F.text.lower().contains("назад"))
+@router.message(CreatePost.submit, F.text.lower().contains("отменить"))
 async def cancel_handler(message: Message, session: AsyncSession, state: FSMContext):
     if not await is_vendor(session, str(message.chat.id)):
         return await default_client_handler(message)
@@ -300,7 +315,7 @@ async def my_groups_handler(message: Message, session: AsyncSession, state: FSMC
         await message.answer("Мои группы", reply_markup=back_kb())
 
     await state.update_data(cities=cities)
-    await message.answer("Выберите группу", reply_markup=subjects_kb(subjects))
+    await message.answer("Выберите направление", reply_markup=subjects_kb(subjects))
     await state.set_state(MyGroups.subject)
 
 
@@ -364,7 +379,7 @@ async def my_groups_groups_back_handler(message: Message, session: AsyncSession,
     found_user = await find_user_by_telegram_id(session, str(message.chat.id))
     client = ApiClient(found_user)
     try:
-        response = client.get_all(Endpoint.CITY, {"subjectId": data["subject_id"]})
+        response = client.get_all(Endpoint.CITY, {"ids": data["cities"][data["subject_id"]]})
         cities = response.get("responseList")
         if not cities:
             return await message.answer("Города не добавлены")
@@ -674,11 +689,383 @@ async def group_delete_cancel(callback: CallbackQuery, callback_data: GroupDelet
 
 
 @router.message(F.text.lower().contains("создать объявление"))
-async def create_post_handler(message: Message, session: AsyncSession):
+@router.message(CreatePost.city, F.text.lower().contains("назад"))
+async def create_post_handler(message: Message, session: AsyncSession, state: FSMContext):
     if not await is_vendor(session, str(message.chat.id)):
         return await default_client_handler(message)
 
-    await message.answer("⚙️ В разработке")
+    found_user = await find_user_by_telegram_id(session, str(message.chat.id))
+    client = ApiClient(found_user)
+    groups = await get_user_groups(session, found_user.id)
+    if not groups:
+        return await message.answer("У вас нету добавленных групп")
+
+    subjects_dict = {}
+    cities = {}
+    for group in groups:
+        try:
+            subject = client.get_by_id(Endpoint.SUBJECT, group.subject_id)
+            if subject.get("id") not in subjects_dict:
+                subjects_dict[subject.get("id")] = subject.get("name")
+
+            if subject.get("id") in cities:
+                cities[subject.get("id")].append(group.city_id)
+
+            else:
+                cities[subject.get("id")] = [group.city_id]
+
+        except Exception as ex:
+            await message.answer(str(ex))
+
+    subjects = []
+    for key, value in subjects_dict.items():
+        subjects.append(
+            {
+                "id": key,
+                "name": value
+            }
+        )
+    if not await state.get_state():
+        await message.answer("Создать объявление", reply_markup=back_kb())
+
+    await state.update_data(cities=cities)
+    await message.answer("Выберите направление", reply_markup=subjects_kb(subjects))
+    await state.set_state(CreatePost.subject)
+
+
+@router.callback_query(CreatePost.subject, SubjectCbData.filter())
+async def create_post_city_handler(callback: CallbackQuery, callback_data: SubjectCbData, session: AsyncSession,
+                                   state: FSMContext):
+    if not await is_vendor(session, str(callback.message.chat.id)):
+        return await default_client_handler(callback.message)
+
+    await state.update_data(subject_id=callback_data.subject_id)
+    found_user = await find_user_by_telegram_id(session, str(callback.message.chat.id))
+    client = ApiClient(found_user)
+    data = await state.get_data()
+    try:
+        response = client.get_all(Endpoint.CITY, {"ids": data["cities"][callback_data.subject_id]})
+        cities = response.get("responseList")
+        if not cities:
+            return await callback.answer("Города не добавлены")
+
+        await callback.message.edit_text(
+            text="Выберите город",
+            reply_markup=cities_kb(cities)
+        )
+        await state.set_state(CreatePost.city)
+
+    except Exception as ex:
+        await callback.answer(str(ex))
+
+
+@router.callback_query(CreatePost.city, CityCbData.filter())
+async def create_post_groups_handler(callback: CallbackQuery, callback_data: CityCbData, session: AsyncSession,
+                                     state: FSMContext):
+    if not await is_vendor(session, str(callback.message.chat.id)):
+        return await default_client_handler(callback.message)
+
+    await state.update_data(city_id=callback_data.city_id)
+    found_user = await find_user_by_telegram_id(session, str(callback.message.chat.id))
+    client = ApiClient(found_user)
+    try:
+        response = client.get_all(Endpoint.GROUP, {
+            "cityId": callback_data.city_id,
+            "userTelegramId": callback.message.chat.id
+        })
+        groups = response.get("responseList")
+        await callback.message.edit_text(
+            text="Выберите группу",
+            reply_markup=all_groups_kb(groups)
+        )
+        await state.set_state(CreatePost.group)
+
+    except Exception as ex:
+        await callback.answer(str(ex))
+
+
+@router.message(CreatePost.group, F.text.lower().contains("назад"))
+async def create_post_groups_back_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    data = await state.get_data()
+    found_user = await find_user_by_telegram_id(session, str(message.chat.id))
+    client = ApiClient(found_user)
+    try:
+        response = client.get_all(Endpoint.CITY, {"ids": data["cities"][data["subject_id"]]})
+        cities = response.get("responseList")
+        if not cities:
+            return await message.answer("Города не добавлены")
+
+        await message.answer(
+            text="Выберите город",
+            reply_markup=cities_kb(cities)
+        )
+        await state.set_state(CreatePost.city)
+
+    except Exception as ex:
+        await message.answer(str(ex))
+
+
+@router.callback_query(CreatePost.group, GroupCbData.filter())
+async def create_post_calendar_handler(callback: CallbackQuery, callback_data: GroupCbData, session: AsyncSession,
+                                       state: FSMContext):
+    if not await is_vendor(session, str(callback.message.chat.id)):
+        return await default_client_handler(callback.message)
+
+    await state.update_data(group_id=callback_data.group_id)
+    await callback.message.answer("Откройте календарь и выберите нужные даты/время",
+                                  reply_markup=calendar_kb(callback_data.group_id))
+    await state.set_state(CreatePost.calendar)
+
+
+@router.message(CreatePost.calendar, F.text.lower().contains("назад"))
+async def create_post_calendar_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    found_user = await find_user_by_telegram_id(session, str(message.chat.id))
+    client = ApiClient(found_user)
+    data = await state.get_data()
+    try:
+        response = client.get_all(Endpoint.GROUP, {
+            "cityId": data["city_id"],
+            "userTelegramId": message.chat.id
+        })
+        groups = response.get("responseList")
+        await message.answer("Назад", reply_markup=back_kb())
+        await message.answer(
+            text="Выберите группу",
+            reply_markup=all_groups_kb(groups)
+        )
+        await state.set_state(CreatePost.group)
+
+    except Exception as ex:
+        await message.answer(str(ex))
+
+
+@router.message(CreatePost.calendar, F.content_type == ContentType.WEB_APP_DATA)
+async def create_post_post_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    await state.update_data(calendar=message.web_app_data.data)
+    await message.answer("Отправьте мне публикацию, она может состоять из фото, видео, гиф или просто текста",
+                         reply_markup=back_kb())
+
+    await state.set_state(CreatePost.post)
+
+
+@router.message(CreatePost.post, F.text.lower().contains("назад"))
+async def create_post_post_back_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    data = await state.get_data()
+    await message.answer("Откройте календарь и выберите нужные даты/время",
+                         reply_markup=calendar_kb(data["group_id"]))
+    await state.set_state(CreatePost.calendar)
+
+
+@router.message(CreatePost.post,
+                F.content_type.in_([ContentType.TEXT, ContentType.PHOTO, ContentType.VIDEO, ContentType.ANIMATION]))
+async def create_post_button_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    if message.content_type == ContentType.PHOTO:
+        await state.update_data(publication_type=PublicationType.PHOTO,
+                                file_id=message.photo[-1].file_id, text=message.html_text)
+
+    elif message.content_type == ContentType.VIDEO:
+        await state.update_data(publication_type=PublicationType.VIDEO,
+                                file_id=message.video.file_id, text=message.html_text)
+
+    elif message.content_type == ContentType.ANIMATION:
+        await state.update_data(publication_type=PublicationType.ANIMATION,
+                                file_id=message.animation.file_id, text=message.html_text)
+
+    elif message.content_type == ContentType.TEXT:
+        await state.update_data(publication_type=PublicationType.TEXT,
+                                file_id=None, text=message.html_text)
+
+    await message.answer("Отправьте мне кнопку в формате:\n<b>текст кнопки | [ссылка]</b>\n\n"
+                         "Пример:\n<code>Перейти | https://www.google.com/</code>",
+                         reply_markup=skip_kb(), parse_mode=ParseMode.HTML)
+    await state.set_state(CreatePost.button)
+
+
+@router.message(CreatePost.button, F.text.lower().contains("назад"))
+async def create_post_button_back_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    await message.answer("Отправьте мне публикацию, она может состоять из фото, видео, гиф или просто текста",
+                         reply_markup=back_kb())
+    await state.set_state(CreatePost.post)
+
+
+def get_publication_info(data):
+    publication_type = data["publication_type"]
+    file_id = data["file_id"]
+    text = data["text"]
+    button_text, button_url = data.get("button_text"), data.get("button_url")
+
+    return {
+        "publication_type": publication_type,
+        "text": text,
+        "file_id": file_id,
+        "button": {
+            "text": button_text,
+            "url": button_url
+        }
+    }
+
+
+def get_post_info(data):
+    calendar = json.loads(data["calendar"])
+    posts = []
+    for post in calendar.get("posts"):
+        date = datetime.strptime(post.get('date'), "%Y-%m-%d").date()
+        time = datetime.strptime(post.get('time'), "%H:%M:%S").time()
+        posts.append({
+            "date": date,
+            "time": time,
+            "with_pin": post.get('withPin')
+        })
+
+    return {
+        "group_id": data.get("group_id"),
+        "total_price": calendar.get("totalPrice"),
+        "posts": posts
+    }
+
+
+@router.message(CreatePost.button, F.text.lower().contains("пропустить"))
+async def create_post_skip_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    data = await state.get_data()
+    publication_info = get_publication_info(data)
+    if publication_info["publication_type"] == PublicationType.TEXT:
+        await message.bot.send_message(message.chat.id,
+                                       publication_info["text"],
+                                       reply_markup=publication_kb(publication_info["button"]),
+                                       parse_mode=ParseMode.HTML)
+
+    elif publication_info["publication_type"] == PublicationType.PHOTO:
+        await message.bot.send_photo(message.chat.id,
+                                     photo=publication_info["file_id"],
+                                     caption=publication_info["text"],
+                                     reply_markup=publication_kb(publication_info["button"]),
+                                     parse_mode=ParseMode.HTML)
+
+    elif publication_info["publication_type"] == PublicationType.VIDEO:
+        await message.bot.send_video(message.chat.id,
+                                     video=publication_info["file_id"],
+                                     caption=publication_info["text"],
+                                     reply_markup=publication_kb(publication_info["button"]),
+                                     parse_mode=ParseMode.HTML)
+
+    elif publication_info["publication_type"] == PublicationType.ANIMATION:
+        await message.bot.send_animation(message.chat.id,
+                                         animation=publication_info["file_id"],
+                                         caption=publication_info["text"],
+                                         reply_markup=publication_kb(publication_info["button"]),
+                                         parse_mode=ParseMode.HTML)
+
+    post_info = get_post_info(data)
+    found_user = await find_user_by_telegram_id(session, str(message.chat.id))
+    client = ApiClient(found_user)
+    try:
+        group = client.get_by_id(Endpoint.GROUP, post_info.get("group_id"))
+
+    except Exception as ex:
+        return await message.answer(str(ex))
+
+    posts = []
+    for post in post_info.get("posts"):
+        posts.append(f"{post['date'].strftime('%m-%d')} {post['time'].strftime('%H:%M')}({'с закрепом' if post['with_pin'] else 'без закрепа'})")
+
+    await message.answer(text=f"Группа: {group.get('name')}\n"
+                              f"Cтоимость: {post_info.get('total_price')}\n"
+                              f"Будет опубликован: {', '.join(posts)}",
+                         reply_markup=submit_post_kb())
+
+    await state.set_state(CreatePost.submit)
+
+
+def is_valid_url(url):
+    parsed_url = urlparse(url)
+    return all([parsed_url.scheme, parsed_url.netloc])
+
+
+@router.message(CreatePost.button, F.text)
+async def create_post_button_valid_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    try:
+        button = message.text
+        text, url = button.split(" | ")
+        if not is_valid_url(url):
+            return await message.answer("Некорректная ссылка, попробуйте еще раз")
+
+    except Exception:
+        return await message.answer("Ошибка во время парсинга, попробуйте еще раз")
+
+    await state.update_data(button_text=text, button_url=url)
+    await create_post_skip_handler(message, session, state)
+
+
+@router.message(CreatePost.submit, F.text.lower().contains("назад"))
+async def create_post_submit_back_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    await message.answer("Отправьте мне кнопку в формате:\n<b>текст кнопки | [ссылка]</b>\n\n"
+                         "Пример:\n<code>Перейти | [https://www.google.com/]</code>",
+                         reply_markup=skip_kb(), parse_mode=ParseMode.HTML)
+    await state.set_state(CreatePost.button)
+
+
+@router.message(CreatePost.submit, F.text.lower().contains("подтвердить"))
+async def create_post_submit_ok_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    data = await state.get_data()
+    found_user = await find_user_by_telegram_id(session, str(message.chat.id))
+    client = ApiClient(found_user)
+    publication_info = get_publication_info(data)
+    post_info = get_post_info(data)
+    publication = PublicationView(
+        publication_type=publication_info.get('publication_type'),
+        file_id=publication_info.get('file_id'),
+        text=publication_info.get('text'),
+        button=ButtonView(
+            name=publication_info.get('button').get('text'),
+            url=publication_info.get('button').get('url'),
+        )
+    )
+    try:
+        for post in post_info.get("posts"):
+            client.create(Endpoint.POST, PostView(
+                publication=publication,
+                group_id=post_info.get('group_id'),
+                with_pin=post.get('with_pin'),
+                publish_date=post.get('date'),
+                publish_time=post.get('time')
+            ).to_dict())
+
+    except Exception as ex:
+        return await message.answer(str(ex))
+
+    await add_post(session, post_info.get('group_id'), post_info.get('total_price'))
+    await message.answer("Объявление создано", reply_markup=main_kb_by_role(message))
+    await state.clear()
 
 
 @router.message(F.text.lower().contains("статистика"))

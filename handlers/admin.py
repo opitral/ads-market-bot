@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from api.client import ApiClient
 from api.enums import Endpoint
 from api.exceptions import NoSuchEntityException
-from api.views import UserView
+from api.views import UserView, SubjectView, CityView
 from config_reader import config
 from database.models import Role, User
 from database.orm_queries import find_user_by_telegram_id, add_user, find_all_users, find_user_by_id, \
@@ -221,10 +221,10 @@ async def set_subject_name_handler(message: Message, session: AsyncSession, stat
     found_user = await find_user_by_telegram_id(session, str(message.chat.id))
     client = ApiClient(found_user)
     try:
-        client.update(Endpoint.SUBJECT, {
-            "id": data["subject_id"],
-            "name": data["new_subject_name"],
-        })
+        client.update(Endpoint.SUBJECT, SubjectView(
+            _id=data["subject_id"],
+            name=data["new_subject_name"]
+        ).to_dict())
 
         await subjects_handler(message, session)
         await message.answer("Новое название направления установлено", reply_markup=subjects_and_cities_kb())
@@ -312,10 +312,10 @@ async def set_city_name_handler(message: Message, session: AsyncSession, state: 
     found_user = await find_user_by_telegram_id(session, str(message.chat.id))
     client = ApiClient(found_user)
     try:
-        client.update(Endpoint.CITY, {
-            "id": data["city_id"],
-            "name": data["new_city_name"],
-        })
+        client.update(Endpoint.CITY, CityView(
+            _id=data["city_id"],
+            name=data["new_city_name"]
+        ).to_dict())
 
         await subjects_handler(message, session)
         await message.answer("Новое название города установлено")
@@ -383,9 +383,9 @@ async def create_subject_handler(message: Message, session: AsyncSession, state:
     found_user = await find_user_by_telegram_id(session, str(message.chat.id))
     client = ApiClient(found_user)
     try:
-        client.create(Endpoint.SUBJECT, {
-            "name": data["new_subject_name"],
-        })
+        client.create(Endpoint.SUBJECT, SubjectView(
+            name=data["new_subject_name"]
+        ).to_dict())
 
         await subjects_handler(message, session)
         await message.answer("Новое направление создано")
@@ -445,10 +445,10 @@ async def create_city_handler(message: Message, session: AsyncSession, state: FS
     found_user = await find_user_by_telegram_id(session, str(message.chat.id))
     client = ApiClient(found_user)
     try:
-        client.create(Endpoint.CITY, {
-            "subjectId": data["new_city_subject_id"],
-            "name": data["new_city_name"]
-        })
+        client.create(Endpoint.CITY, CityView(
+            name=data["new_city_name"],
+            subject_id=data["new_city_subject_id"]
+        ).to_dict())
 
         await subjects_handler(message, session)
         await message.answer("Новый город создан")

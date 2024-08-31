@@ -1,5 +1,10 @@
+import datetime
+
+from api.enums import PublicationType, PostStatus
+
+
 class SubjectView:
-    def __init__(self, name, _id=None):
+    def __init__(self, name: str, _id: int = None):
         self.id = _id
         self.name = name
 
@@ -11,20 +16,25 @@ class SubjectView:
 
 
 class CityView:
-    def __init__(self, city, subject_id, _id=None):
+    def __init__(self, name: str, subject_id: id = None, _id: int = None):
         self.id = _id
-        self.city = city
+        self.name = name
         self.subject_id = subject_id
 
     def to_dict(self):
-        return {
+        data = {
             "id": self.id,
-            "city": self.city,
+            "name": self.name,
+            "subjectId": self.subject_id
         }
+        if not self.subject_id:
+            del data["subjectId"]
+
+        return data
 
 
 class UserView:
-    def __init__(self, telegram_id, _id=None):
+    def __init__(self, telegram_id: str, _id: int = None):
         self.id = _id
         self.telegram_id = telegram_id
 
@@ -36,7 +46,7 @@ class UserView:
 
 
 class PriceView:
-    def __init__(self, without_pin, with_pin):
+    def __init__(self, without_pin: int, with_pin: int):
         self.without_pin = without_pin
         self.with_pin = with_pin
 
@@ -48,11 +58,12 @@ class PriceView:
 
 
 class GroupView:
-    def __init__(self, name, group_telegram_id, user_telegram_id, city_id, price_for_one_day: PriceView,
+    def __init__(self, name: str, group_telegram_id: str, user_telegram_id: str, city_id: int,
+                 price_for_one_day: PriceView,
                  price_for_one_week: PriceView,
                  price_for_two_weeks: PriceView, price_for_one_month: PriceView,
-                 working_hours_start="00:00", working_hours_end="24:00",
-                 post_interval_in_minutes=60, link=None, _id=None):
+                 working_hours_start: str = "00:00", working_hours_end: str = "24:00",
+                 post_interval_in_minutes: int = 60, link: str = None, _id: int = None):
         self.id = _id
         self.name = name
         self.group_telegram_id = group_telegram_id
@@ -86,46 +97,52 @@ class GroupView:
 
 
 class ButtonView:
-    def __init__(self, text, url):
-        self.text = text
+    def __init__(self, name: str, url: str):
+        self.name = name
         self.url = url
 
     def to_dict(self):
         return {
-            "text": self.text,
+            "name": self.name,
             "url": self.url
         }
 
 
 class PublicationView:
-    def __init__(self, _type, file_id=None, text=None, button=None):
-        self.type = _type
+    def __init__(self, publication_type: PublicationType, file_id: int = None, text: str = None, button: ButtonView = None):
+        self.publication_type = publication_type
         self.file_id = file_id
         self.text = text
         self.button = button
 
     def to_dict(self):
         return {
-            "type": self.type,
+            "type": self.publication_type.value,
             "fileId": self.file_id,
             "text": self.text,
-            "button": self.button
+            "button": self.button.to_dict()
         }
 
 
 class PostView:
-    def __init__(self, publication, group_id, publish_date, publish_time, _id=None):
+    def __init__(self, publication: PublicationView, group_id: int, with_pin: bool,
+                 publish_date: datetime.date, publish_time: datetime.time,
+                 _id: int = None, status: PostStatus = PostStatus.AWAITS):
         self.id = _id
         self.publication = publication
         self.group_id = group_id
+        self.with_pin = with_pin
         self.publish_date = publish_date
         self.publish_time = publish_time
+        self.status = status
 
     def to_dict(self):
         return {
             "id": self.id,
-            "publication": self.publication,
+            "publication": self.publication.to_dict(),
             "groupId": self.group_id,
-            "publishDate": self.publish_date,
-            "publishTime": self.publish_time
+            "withPin": self.with_pin,
+            "publishDate": self.publish_date.strftime("%Y-%m-%d"),
+            "publishTime": self.publish_time.strftime("%H:%M"),
+            "status": self.status.value
         }

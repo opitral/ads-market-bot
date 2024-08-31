@@ -5,7 +5,7 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from database.models import User, Role, Group, Message
+from database.models import User, Role, Group, Message, Post
 
 
 async def find_user_by_telegram_id(session: AsyncSession, telegram_id: str) -> User:
@@ -123,3 +123,12 @@ async def get_messages_count_last_7_days(session: AsyncSession, group_id: int) -
     result = await session.execute(query)
     messages_count = result.scalar()
     return messages_count
+
+
+async def add_post(session: AsyncSession, group_id: int, total_price: int):
+    post = Post(
+        group_id=group_id,
+        total_price=total_price
+    )
+    session.add(post)
+    await session.commit()
