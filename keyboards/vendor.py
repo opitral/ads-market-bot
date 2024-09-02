@@ -54,6 +54,8 @@ def cities_kb(cities: List[dict]) -> InlineKeyboardMarkup:
 def back_kb() -> ReplyKeyboardMarkup:
     kb = ReplyKeyboardBuilder()
     kb.button(text="Назад")
+    kb.button(text="Отменить")
+    kb.adjust(1)
     return kb.as_markup(resize_keyboard=True)
 
 
@@ -70,6 +72,7 @@ def group_choose_kb() -> ReplyKeyboardMarkup:
         )
     )
     kb.button(text="Назад")
+    kb.button(text="Отменить")
     kb.adjust(1)
     return kb.as_markup(resize_keyboard=True)
 
@@ -133,6 +136,7 @@ def calendar_kb(group_id: int) -> ReplyKeyboardMarkup:
     web_app_info = WebAppInfo(url=f"{config.CALENDAR_URL}?id={group_id}")
     kb.button(text="Календарь", web_app=web_app_info)
     kb.button(text="Назад")
+    kb.button(text="Отменить")
 
     kb.adjust(1)
     return kb.as_markup(resize_keyboard=True)
@@ -142,6 +146,7 @@ def skip_kb() -> ReplyKeyboardMarkup:
     kb = ReplyKeyboardBuilder()
     kb.button(text="Пропустить")
     kb.button(text="Назад")
+    kb.button(text="Отменить")
     kb.adjust(1)
     return kb.as_markup(resize_keyboard=True)
 
@@ -156,9 +161,9 @@ def publication_kb(button) -> InlineKeyboardMarkup:
 def submit_post_kb() -> ReplyKeyboardMarkup:
     kb = ReplyKeyboardBuilder()
     kb.button(text="Подтвердить")
-    kb.button(text="Отменить")
     kb.button(text="Назад")
-    kb.adjust(2)
+    kb.button(text="Отменить")
+    kb.adjust(1)
     return kb.as_markup(resize_keyboard=True)
 
 
@@ -167,6 +172,13 @@ def statistic_samples_kb() -> ReplyKeyboardMarkup:
     kb.button(text="Общая")
     kb.button(text="Выбрать группу")
     kb.button(text="Назад")
+    kb.button(text="Отменить")
 
-    kb.adjust(2)
+    kb.adjust(2, 1, 1)
+    return kb.as_markup(resize_keyboard=True)
+
+
+def to_main_menu_kb() -> ReplyKeyboardMarkup:
+    kb = ReplyKeyboardBuilder()
+    kb.button(text="В главное меню")
     return kb.as_markup(resize_keyboard=True)

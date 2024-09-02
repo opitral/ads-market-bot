@@ -24,7 +24,7 @@ from keyboards.admin import main_kb as admin_main_kb
 from keyboards.vendor import main_kb, subjects_kb, SubjectCbData, cities_kb, back_kb, CityCbData, \
     group_choose_kb, all_groups_kb, GroupCbData, group_kb, GroupWorkTimesCbData, GroupPostsIntervalCbData, \
     GroupPriceListCbData, GroupDeleteCbData, submit_delete_kb, GroupDeleteSubmitCbData, GroupDeleteCancelCbData, \
-    calendar_kb, skip_kb, publication_kb, submit_post_kb, statistic_samples_kb
+    calendar_kb, skip_kb, publication_kb, submit_post_kb, statistic_samples_kb, to_main_menu_kb
 
 router = Router()
 router.message.filter(ChatTypeFilter(is_group=False))
@@ -128,8 +128,9 @@ async def add_group_handler(message: Message, session: AsyncSession, state: FSMC
 @router.message(GroupPostsInterval.interval, F.text.lower().contains("назад"))
 @router.message(GroupPriceList.price_list, F.text.lower().contains("назад"))
 @router.message(CreatePost.subject, F.text.lower().contains("назад"))
-@router.message(CreatePost.submit, F.text.lower().contains("отменить"))
 @router.message(Statistic.sample, F.text.lower().contains("назад"))
+@router.message(F.text.lower().contains("отменить"))
+@router.message(F.text.lower().contains("В главное меню"))
 async def cancel_handler(message: Message, session: AsyncSession, state: FSMContext):
     if not await is_vendor(session, str(message.chat.id)):
         return await default_client_handler(message)
@@ -460,8 +461,7 @@ async def my_groups_group_handler(callback: CallbackQuery, callback_data: GroupC
             parse_mode=ParseMode.HTML,
             reply_markup=group_kb(callback_data.group_id)
         )
-        await state.clear()
-        await callback.message.answer(f"Главное меню", reply_markup=main_kb_by_role(callback.message))
+        await callback.message.answer(f"id: {callback_data.group_id}", reply_markup=to_main_menu_kb())
 
     except TelegramAPIError:
         return await callback.answer("Бот не является участником группы")
@@ -1252,7 +1252,10 @@ async def statistic_group_handler(callback: CallbackQuery, callback_data: GroupC
         posts_total_count = 0
         for i in range(1, 8):
             date = datetime.now() - timedelta(days=i)
-            posts = client.get_all(Endpoint.POST, {"publishDate": date.date().strftime("%Y-%m-%d")})
+            posts = client.get_all(Endpoint.POST, {
+                "publishDate": date.date().strftime("%Y-%m-%d"),
+                "groupTelegramId": group["groupTelegramId"]
+            })
             posts_total_count += posts.get("total")
 
     except Exception as ex:
