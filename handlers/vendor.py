@@ -480,7 +480,7 @@ async def change_group_work_times_handler(callback: CallbackQuery, callback_data
                                   "<b>время начала работы-время конца работы</b>\n"
                                   "*Минуты будут автоматически установлены в ноли\n\n"
                                   "Пример:\n"
-                                  "<code>12:00-20:00</code>", parse_mode=ParseMode.HTML, reply_markup=back_kb())
+                                  "<code>8:00-24:00</code>", parse_mode=ParseMode.HTML, reply_markup=back_kb())
 
     await callback.answer()
     await state.update_data(group_id=callback_data.group_id)
@@ -535,7 +535,8 @@ async def change_group_posts_interval_handler(callback: CallbackQuery, callback_
     await callback.message.answer("Отправьте мне интервал между публикациями в минутах\n"
                                   "*Значение должно быть кратным 30\n\n"
                                   "Пример:\n"
-                                  "<code>120</code>", parse_mode=ParseMode.HTML, reply_markup=back_kb())
+                                  "<code>30 = 30 минут\n60 = 1 час \n90 = 1.5 часа \n120 = 2 часа\n180 = 3 часа</code>",
+                                  parse_mode=ParseMode.HTML, reply_markup=back_kb())
 
     await callback.answer()
     await state.update_data(group_id=callback_data.group_id)
