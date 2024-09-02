@@ -1,5 +1,5 @@
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
 from aiogram import Router, F
@@ -16,14 +16,15 @@ from api.enums import Endpoint, PublicationType
 from api.views import UserView, PriceView, GroupView, PostView, PublicationView, ButtonView
 from config_reader import config
 from database.orm_queries import is_vendor, find_user_by_telegram_id, add_user, add_group, get_user_groups, \
-    get_group_by_telegram_id_and_user_telegram_id, delete_group, get_messages_count_last_7_days, add_post
+    get_group_by_telegram_id_and_user_telegram_id, delete_group, get_messages_count_last_7_days, add_post, \
+    get_total_price_last_days, get_total_price_all_time
 from filters.chat_type import ChatTypeFilter
 from handlers.client import default_client_handler
 from keyboards.admin import main_kb as admin_main_kb
 from keyboards.vendor import main_kb, subjects_kb, SubjectCbData, cities_kb, back_kb, CityCbData, \
     group_choose_kb, all_groups_kb, GroupCbData, group_kb, GroupWorkTimesCbData, GroupPostsIntervalCbData, \
     GroupPriceListCbData, GroupDeleteCbData, submit_delete_kb, GroupDeleteSubmitCbData, GroupDeleteCancelCbData, \
-    calendar_kb, skip_kb, publication_kb, submit_post_kb
+    calendar_kb, skip_kb, publication_kb, submit_post_kb, statistic_samples_kb
 
 router = Router()
 router.message.filter(ChatTypeFilter(is_group=False))
@@ -85,6 +86,13 @@ class CreatePost(StatesGroup):
     submit = State()
 
 
+class Statistic(StatesGroup):
+    sample = State()
+    subject = State()
+    city = State()
+    group = State()
+
+
 @router.message(F.text.lower().contains("добавить группу"))
 @router.message(AddGroup.city, F.text.lower().contains("назад"))
 async def add_group_handler(message: Message, session: AsyncSession, state: FSMContext):
@@ -121,6 +129,7 @@ async def add_group_handler(message: Message, session: AsyncSession, state: FSMC
 @router.message(GroupPriceList.price_list, F.text.lower().contains("назад"))
 @router.message(CreatePost.subject, F.text.lower().contains("назад"))
 @router.message(CreatePost.submit, F.text.lower().contains("отменить"))
+@router.message(Statistic.sample, F.text.lower().contains("назад"))
 async def cancel_handler(message: Message, session: AsyncSession, state: FSMContext):
     if not await is_vendor(session, str(message.chat.id)):
         return await default_client_handler(message)
@@ -821,7 +830,7 @@ async def create_post_calendar_handler(callback: CallbackQuery, callback_data: G
 
 
 @router.message(CreatePost.calendar, F.text.lower().contains("назад"))
-async def create_post_calendar_handler(message: Message, session: AsyncSession, state: FSMContext):
+async def create_post_calendar_back_handler(message: Message, session: AsyncSession, state: FSMContext):
     if not await is_vendor(session, str(message.chat.id)):
         return await default_client_handler(message)
 
@@ -1070,11 +1079,199 @@ async def create_post_submit_ok_handler(message: Message, session: AsyncSession,
 
 
 @router.message(F.text.lower().contains("статистика"))
-async def statistic_handler(message: Message, session: AsyncSession):
+@router.message(Statistic.subject, F.text.lower().contains("назад"))
+async def statistic_handler(message: Message, session: AsyncSession, state: FSMContext):
     if not await is_vendor(session, str(message.chat.id)):
         return await default_client_handler(message)
 
-    await message.answer("⚙️ В разработке")
+    await message.answer("Статистика по группах", reply_markup=statistic_samples_kb())
+    await state.set_state(Statistic.sample)
+
+
+@router.message(Statistic.sample, F.text.lower().contains("общая"))
+async def statistic_sample_all_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    found_user = await find_user_by_telegram_id(session, str(message.chat.id))
+    groups = await get_user_groups(session, found_user.id)
+    if not groups:
+        return await message.answer("У вас нету добавленных групп")
+
+    total = 0
+    month = 0
+    week = 0
+    for group in groups:
+        total += await get_total_price_all_time(session, group.id)
+        month += await get_total_price_last_days(session, group.id, 30)
+        week += await get_total_price_last_days(session, group.id, 7)
+
+    await message.answer(f"Общая статистика\n"
+                         f"Заработано всего - {total}\n"
+                         f"Заработано за месяц - {month}\n"
+                         f"Заработано за неделю - {week}", reply_markup=main_kb_by_role(message))
+    await state.clear()
+
+
+@router.message(Statistic.sample, F.text.lower().contains("выбрать группу"))
+@router.message(Statistic.city, F.text.lower().contains("назад"))
+async def statistic_sample_one_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    found_user = await find_user_by_telegram_id(session, str(message.chat.id))
+    client = ApiClient(found_user)
+    groups = await get_user_groups(session, found_user.id)
+    if not groups:
+        return await message.answer("У вас нету добавленных групп")
+
+    subjects_dict = {}
+    cities = {}
+    for group in groups:
+        try:
+            subject = client.get_by_id(Endpoint.SUBJECT, group.subject_id)
+            if subject.get("id") not in subjects_dict:
+                subjects_dict[subject.get("id")] = subject.get("name")
+
+            if subject.get("id") in cities:
+                cities[subject.get("id")].append(group.city_id)
+
+            else:
+                cities[subject.get("id")] = [group.city_id]
+
+        except Exception as ex:
+            await message.answer(str(ex))
+
+    subjects = []
+    for key, value in subjects_dict.items():
+        subjects.append(
+            {
+                "id": key,
+                "name": value
+            }
+        )
+    if await state.get_state() == Statistic.sample:
+        await message.answer("Статистика по выбранной группе", reply_markup=back_kb())
+
+    await state.update_data(cities=cities)
+    await message.answer("Выберите направление", reply_markup=subjects_kb(subjects))
+    await state.set_state(Statistic.subject)
+
+
+@router.callback_query(Statistic.subject, SubjectCbData.filter())
+async def statistic_city_handler(callback: CallbackQuery, callback_data: SubjectCbData, session: AsyncSession,
+                                 state: FSMContext):
+    if not await is_vendor(session, str(callback.message.chat.id)):
+        return await default_client_handler(callback.message)
+
+    await state.update_data(subject_id=callback_data.subject_id)
+    found_user = await find_user_by_telegram_id(session, str(callback.message.chat.id))
+    client = ApiClient(found_user)
+    data = await state.get_data()
+    try:
+        response = client.get_all(Endpoint.CITY, {"ids": data["cities"][callback_data.subject_id]})
+        cities = response.get("responseList")
+        if not cities:
+            return await callback.answer("Города не добавлены")
+
+        await callback.message.edit_text(
+            text="Выберите город",
+            reply_markup=cities_kb(cities)
+        )
+        await state.set_state(Statistic.city)
+
+    except Exception as ex:
+        await callback.answer(str(ex))
+
+
+@router.callback_query(Statistic.city, CityCbData.filter())
+async def statistic_groups_handler(callback: CallbackQuery, callback_data: CityCbData, session: AsyncSession,
+                                   state: FSMContext):
+    if not await is_vendor(session, str(callback.message.chat.id)):
+        return await default_client_handler(callback.message)
+
+    await state.update_data(city_id=callback_data.city_id)
+    found_user = await find_user_by_telegram_id(session, str(callback.message.chat.id))
+    client = ApiClient(found_user)
+    try:
+        response = client.get_all(Endpoint.GROUP, {
+            "cityId": callback_data.city_id,
+            "userTelegramId": callback.message.chat.id
+        })
+        groups = response.get("responseList")
+        await callback.message.edit_text(
+            text="Выберите группу",
+            reply_markup=all_groups_kb(groups)
+        )
+        await state.set_state(Statistic.group)
+
+    except Exception as ex:
+        await callback.answer(str(ex))
+
+
+@router.message(Statistic.group, F.text.lower().contains("назад"))
+async def statistic_groups_back_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    data = await state.get_data()
+    found_user = await find_user_by_telegram_id(session, str(message.chat.id))
+    client = ApiClient(found_user)
+    try:
+        response = client.get_all(Endpoint.CITY, {"ids": data["cities"][data["subject_id"]]})
+        cities = response.get("responseList")
+        if not cities:
+            return await message.answer("Города не добавлены")
+
+        await message.answer(
+            text="Выберите город",
+            reply_markup=cities_kb(cities)
+        )
+        await state.set_state(Statistic.city)
+
+    except Exception as ex:
+        await message.answer(str(ex))
+
+
+@router.callback_query(Statistic.group, GroupCbData.filter())
+async def statistic_group_handler(callback: CallbackQuery, callback_data: GroupCbData, session: AsyncSession,
+                                  state: FSMContext):
+    if not await is_vendor(session, str(callback.message.chat.id)):
+        return await default_client_handler(callback.message)
+
+    await state.update_data(group_id=callback_data.group_id)
+    found_user = await find_user_by_telegram_id(session, str(callback.message.chat.id))
+    client = ApiClient(found_user)
+    try:
+        group = client.get_by_id(Endpoint.GROUP, callback_data.group_id)
+        schedule = client.get_by_id(Endpoint.SCHEDULE, callback_data.group_id)
+        times_in_day = len(schedule.get("weeks")[0].get("days")[0].get("times"))
+        posts_total_count = 0
+        for i in range(1, 8):
+            date = datetime.now() - timedelta(days=i)
+            posts = client.get_all(Endpoint.POST, {"publishDate": date.date().strftime("%Y-%m-%d")})
+            posts_total_count += posts.get("total")
+
+    except Exception as ex:
+        return await callback.answer(str(ex))
+
+    group_local = await get_group_by_telegram_id_and_user_telegram_id(session,
+                                                                      group["groupTelegramId"],
+                                                                      str(callback.message.chat.id))
+
+    total = await get_total_price_all_time(session, group_local.id)
+    month = await get_total_price_last_days(session, group_local.id, 30)
+    week = await get_total_price_last_days(session, group_local.id, 7)
+
+    await callback.message.edit_text(text=f"Статистика группы <b>{group['name']}</b>\n"
+                                          f"Заработано всего - {total}\n"
+                                          f"Заработано за месяц - {month}\n"
+                                          f"Заработано за неделю - {week}\n"
+                                          f"Процент покрытия закрытых объявлений - "
+                                          f"{int(posts_total_count*100/times_in_day)}%", parse_mode=ParseMode.HTML)
+
+    await callback.message.answer("Главное меню", reply_markup=main_kb_by_role(callback.message))
+    await state.clear()
 
 
 @router.message()

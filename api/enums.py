@@ -10,6 +10,7 @@ class Endpoint(Enum):
     GROUP = f"{BASE_URL}/group"
     POST = f"{BASE_URL}/post"
     USER = f"{BASE_URL}/user"
+    SCHEDULE = f"{BASE_URL}/schedule"
 
     def __str__(self):
         return self.value

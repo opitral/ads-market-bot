@@ -132,3 +132,27 @@ async def add_post(session: AsyncSession, group_id: int, total_price: int):
     )
     session.add(post)
     await session.commit()
+
+
+async def get_total_price_all_time(session: AsyncSession, group_id: int) -> int:
+    query = select(func.sum(Post.total_price)).where(
+        Post.group_id == group_id
+    )
+
+    result = await session.execute(query)
+    total_price = result.scalar() or 0
+    return total_price
+
+
+async def get_total_price_last_days(session: AsyncSession, group_id: int, days: int) -> int:
+    now = datetime.now()
+    thirty_days_ago = now - timedelta(days=days)
+
+    query = select(func.sum(Post.total_price)).where(
+        Post.group_id == group_id,
+        Post.created_at >= thirty_days_ago
+    )
+
+    result = await session.execute(query)
+    total_price = result.scalar() or 0
+    return total_price

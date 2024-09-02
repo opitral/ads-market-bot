@@ -23,7 +23,8 @@ class ApiClient:
             Endpoint.CITY: [Method.GET],
             Endpoint.GROUP: [Method.GET, Method.POST, Method.PUT, Method.DELETE],
             Endpoint.USER: [Method.POST],
-            Endpoint.POST: [Method.POST],
+            Endpoint.POST: [Method.POST, Method.GET],
+            Endpoint.SCHEDULE: [Method.GET]
         }
 
         if self.user.role == Role.ADMIN:

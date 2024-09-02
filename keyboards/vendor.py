@@ -160,3 +160,13 @@ def submit_post_kb() -> ReplyKeyboardMarkup:
     kb.button(text="Назад")
     kb.adjust(2)
     return kb.as_markup(resize_keyboard=True)
+
+
+def statistic_samples_kb() -> ReplyKeyboardMarkup:
+    kb = ReplyKeyboardBuilder()
+    kb.button(text="Общая")
+    kb.button(text="Выбрать группу")
+    kb.button(text="Назад")
+
+    kb.adjust(2)
+    return kb.as_markup(resize_keyboard=True)
