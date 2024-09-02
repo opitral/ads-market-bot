@@ -1021,6 +1021,8 @@ async def create_post_button_valid_handler(message: Message, session: AsyncSessi
     try:
         button = message.text
         text, url = button.split(" | ")
+        if url.startswith("@"):
+            url = "https://t.me/" + url[1:]
         if not is_valid_url(url):
             return await message.answer("Некорректная ссылка, попробуйте еще раз")
 
