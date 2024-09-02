@@ -861,7 +861,8 @@ async def create_post_post_handler(message: Message, session: AsyncSession, stat
         return await default_client_handler(message)
 
     await state.update_data(calendar=message.web_app_data.data)
-    await message.answer("Отправьте мне публикацию, она может состоять из фото, видео, гиф или просто текста",
+    await message.answer("Отправьте мне публикацию, она может состоять из фото, видео, гиф или просто текста\n"
+                         "*Прмиум стикеры не отображаются, учитывайте это при создании объявления",
                          reply_markup=back_kb())
 
     await state.set_state(CreatePost.post)
