@@ -534,6 +534,7 @@ async def change_group_posts_interval_handler(callback: CallbackQuery, callback_
 
     await callback.message.answer("Отправьте мне интервал между публикациями в минутах\n"
                                   "*Значение должно быть кратным 30\n\n"
+                                  "**Максимальный интервал 5 часов"
                                   "Пример:\n"
                                   "<code>30 = 30 минут\n60 = 1 час \n90 = 1.5 часа \n120 = 2 часа\n180 = 3 часа</code>",
                                   parse_mode=ParseMode.HTML, reply_markup=back_kb())
@@ -555,6 +556,9 @@ async def set_group_posts_interval_handler(message: Message, session: AsyncSessi
     try:
         interval = int(message.text)
         if interval % 30 != 0:
+            raise
+
+        if interval < 30 or interval > 300:
             raise
 
     except Exception:
