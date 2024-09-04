@@ -55,7 +55,10 @@ class AddGroup(StatesGroup):
     subject = State()
     city = State()
     group = State()
-    price = State()
+    price_1 = State()
+    price_7 = State()
+    price_14 = State()
+    price_30 = State()
 
 
 class MyGroups(StatesGroup):
@@ -73,7 +76,10 @@ class GroupPostsInterval(StatesGroup):
 
 
 class GroupPriceList(StatesGroup):
-    price_list = State()
+    price_1 = State()
+    price_7 = State()
+    price_14 = State()
+    price_30 = State()
 
 
 class CreatePost(StatesGroup):
@@ -127,7 +133,7 @@ async def add_group_handler(message: Message, session: AsyncSession, state: FSMC
 @router.message(MyGroups.subject, F.text.lower().contains("назад"))
 @router.message(GroupWorkTimes.work_times, F.text.lower().contains("назад"))
 @router.message(GroupPostsInterval.interval, F.text.lower().contains("назад"))
-@router.message(GroupPriceList.price_list, F.text.lower().contains("назад"))
+@router.message(GroupPriceList.price_1, F.text.lower().contains("назад"))
 @router.message(CreatePost.subject, F.text.lower().contains("назад"))
 @router.message(Statistic.sample, F.text.lower().contains("назад"))
 @router.message(F.text.lower().contains("отменить"))
@@ -203,7 +209,7 @@ async def add_group_group_back_handler(message: Message, session: AsyncSession, 
 
 
 @router.message(AddGroup.group, F.chat_shared)
-async def add_group_price_handler(message: Message, session: AsyncSession, state: FSMContext):
+async def add_group_price_1_handler(message: Message, session: AsyncSession, state: FSMContext):
     if not await is_vendor(session, str(message.chat.id)):
         return await default_client_handler(message)
 
@@ -215,15 +221,15 @@ async def add_group_price_handler(message: Message, session: AsyncSession, state
     await state.update_data(group_name=message.chat_shared.title)
     await state.update_data(group_username=message.chat_shared.username)
 
-    await message.answer("Отправьте мне прайс лист в формате:\n*кол-во дней - цена без закрепа/цена с закрепом*\n\n"
-                         "Пример:\n<code>1 - 10/15\n7 - 50/75\n14 - 90/140\n30 - 170/270</code>",
+    await message.answer("Отправьте мне стоимость за 1 день в формате:\n<b>цена без закрепа/цена с закрепом</b>\n\n"
+                         "Пример:\n<code>10/15</code>",
                          parse_mode=ParseMode.HTML,
                          reply_markup=back_kb())
-    await state.set_state(AddGroup.price)
+    await state.set_state(AddGroup.price_1)
 
 
-@router.message(AddGroup.price, F.text.lower().contains("назад"))
-async def add_group_price_back_handler(message: Message, session: AsyncSession, state: FSMContext):
+@router.message(AddGroup.price_1, F.text.lower().contains("назад"))
+async def add_group_price_1_back_handler(message: Message, session: AsyncSession, state: FSMContext):
     if not await is_vendor(session, str(message.chat.id)):
         return await default_client_handler(message)
 
@@ -231,31 +237,114 @@ async def add_group_price_back_handler(message: Message, session: AsyncSession, 
     await state.set_state(AddGroup.group)
 
 
-@router.message(AddGroup.price, F.text)
+@router.message(AddGroup.price_1, F.text)
+async def create_group_price_7_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    try:
+        price_without_pin, price_with_pin = message.text.split("/", maxsplit=1)
+        if (int(price_without_pin) < 1 or int(price_without_pin) > 10000 or
+                int(price_with_pin) < 1 or int(price_with_pin) > 10000):
+            return await message.answer("Минимальная цена - 1, максимальная цена - 10000")
+
+        await state.update_data(price_1=PriceView(int(price_without_pin), int(price_with_pin)))
+
+    except Exception:
+        return await message.answer("Ошибка парсинга, попробуйте еще раз")
+
+    await message.answer("Отправьте мне стоимость за 1 неделю в формате:\n<b>цена без закрепа/цена с закрепом</b>\n\n"
+                         "Пример:\n<code>50/75</code>", parse_mode=ParseMode.HTML)
+    await state.set_state(AddGroup.price_7)
+
+
+@router.message(AddGroup.price_7, F.text.lower().contains("назад"))
+async def create_group_price_7_back_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    await message.answer("Отправьте мне стоимость за 1 день в формате:\n<b>цена без закрепа/цена с закрепом</b>\n\n"
+                         "Пример:\n<code>10/15</code>",
+                         parse_mode=ParseMode.HTML)
+    await state.set_state(AddGroup.price_1)
+
+
+@router.message(AddGroup.price_7, F.text)
+async def create_group_price_14_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    try:
+        price_without_pin, price_with_pin = message.text.split("/", maxsplit=1)
+        if (int(price_without_pin) < 1 or int(price_without_pin) > 10000 or
+                int(price_with_pin) < 1 or int(price_with_pin) > 10000):
+            return await message.answer("Минимальная цена - 1, максимальная цена - 10000")
+
+        await state.update_data(price_7=PriceView(int(price_without_pin), int(price_with_pin)))
+
+    except Exception:
+        return await message.answer("Ошибка парсинга, попробуйте еще раз")
+
+    await message.answer("Отправьте мне стоимость за 2 недели в формате:\n<b>цена без закрепа/цена с закрепом</b>\n\n"
+                         "Пример:\n<code>90/140</code>", parse_mode=ParseMode.HTML)
+    await state.set_state(AddGroup.price_14)
+
+
+@router.message(AddGroup.price_14, F.text.lower().contains("назад"))
+async def create_group_price_14_back_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    await message.answer("Отправьте мне стоимость за 1 неделю в формате:\n<b>цена без закрепа/цена с закрепом</b>\n\n"
+                         "Пример:\n<code>50/75</code>",
+                         parse_mode=ParseMode.HTML)
+    await state.set_state(AddGroup.price_7)
+
+
+@router.message(AddGroup.price_14, F.text)
+async def create_group_price_30_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    try:
+        price_without_pin, price_with_pin = message.text.split("/", maxsplit=1)
+        if (int(price_without_pin) < 1 or int(price_without_pin) > 10000 or
+                int(price_with_pin) < 1 or int(price_with_pin) > 10000):
+            return await message.answer("Минимальная цена - 1, максимальная цена - 10000")
+
+        await state.update_data(price_14=PriceView(int(price_without_pin), int(price_with_pin)))
+
+    except Exception:
+        return await message.answer("Ошибка парсинга, попробуйте еще раз")
+
+    await message.answer("Отправьте мне стоимость за 1 месяц в формате:\n<b>цена без закрепа/цена с закрепом</b>\n\n"
+                         "Пример:\n<code>170/270</code>", parse_mode=ParseMode.HTML)
+    await state.set_state(AddGroup.price_30)
+
+
+@router.message(AddGroup.price_30, F.text.lower().contains("назад"))
+async def create_group_price_30_back_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    await message.answer("Отправьте мне стоимость за 2 недели в формате:\n<b>цена без закрепа/цена с закрепом</b>\n\n"
+                         "Пример:\n<code>90/140</code>",
+                         parse_mode=ParseMode.HTML)
+    await state.set_state(AddGroup.price_14)
+
+
+@router.message(AddGroup.price_30, F.text)
 async def create_group_handler(message: Message, session: AsyncSession, state: FSMContext):
     if not await is_vendor(session, str(message.chat.id)):
         return await default_client_handler(message)
 
-    price_list = []
     try:
-        counts = [1, 7, 14, 30]
-        index = 0
-        data = message.text
-        days = data.split("\n")
-        if len(days) != 4:
-            raise
+        price_without_pin, price_with_pin = message.text.split("/", maxsplit=1)
+        if (int(price_without_pin) < 1 or int(price_without_pin) > 10000 or
+                int(price_with_pin) < 1 or int(price_with_pin) > 10000):
+            return await message.answer("Минимальная цена - 1, максимальная цена - 10000")
 
-        for day in days:
-            day_details = day.split(" - ")
-            count = int(day_details[0])
-            if count != counts[index]:
-                raise
-
-            prices = day_details[1].split("/")
-            price_without_pin = int(prices[0])
-            price_with_pin = int(prices[1])
-            price_list.append(PriceView(price_without_pin, price_with_pin))
-            index += 1
+        await state.update_data(price_30=PriceView(int(price_without_pin), int(price_with_pin)))
 
     except Exception:
         return await message.answer("Ошибка парсинга, попробуйте еще раз")
@@ -272,10 +361,10 @@ async def create_group_handler(message: Message, session: AsyncSession, state: F
             link=data.get("group_link"),
             group_telegram_id=data.get("group_telegram_id"),
             user_telegram_id=str(message.chat.id),
-            price_for_one_day=price_list[0],
-            price_for_one_week=price_list[1],
-            price_for_two_weeks=price_list[2],
-            price_for_one_month=price_list[3]
+            price_for_one_day=data.get("price_1"),
+            price_for_one_week=data.get("price_7"),
+            price_for_two_weeks=data.get("price_14"),
+            price_for_one_month=data.get("price_30")
         ).to_dict())
         await message.answer("Группа добавлена, теперь добавьте бота в эту группу и сделайте администратором",
                              reply_markup=main_kb_by_role(message))
@@ -583,47 +672,130 @@ async def set_group_posts_interval_handler(message: Message, session: AsyncSessi
 
 
 @router.callback_query(GroupPriceListCbData.filter())
-async def change_group_price_list_handler(callback: CallbackQuery, callback_data: GroupCbData, session: AsyncSession,
-                                          state: FSMContext):
+async def change_group_price_1_handler(callback: CallbackQuery, callback_data: GroupCbData, session: AsyncSession,
+                                       state: FSMContext):
     if not await is_vendor(session, str(callback.message.chat.id)):
         return await default_client_handler(callback.message)
 
-    await callback.message.answer("Отправьте мне прайс лист в формате:\n"
-                                  "*кол-во дней - цена без закрепа/цена с закрепом*\n\n"
-                                  "Пример:\n<code>1 - 10/15\n7 - 50/75\n14 - 90/140\n30 - 170/270</code>",
+    await callback.message.answer("Отправьте мне стоимость за 1 день в формате:\n"
+                                  "<b>цена без закрепа/цена с закрепом</b>\n\n"
+                                  "Пример:\n<code>10/15</code>",
                                   parse_mode=ParseMode.HTML,
                                   reply_markup=back_kb())
 
     await callback.answer()
     await state.update_data(group_id=callback_data.group_id)
-    await state.set_state(GroupPriceList.price_list)
+    await state.set_state(GroupPriceList.price_1)
 
 
-@router.message(GroupPriceList.price_list, F.text)
-async def set_group_price_list_handler(message: Message, session: AsyncSession, state: FSMContext):
+@router.message(GroupPriceList.price_1, F.text)
+async def change_group_price_7_handler(message: Message, session: AsyncSession, state: FSMContext):
     if not await is_vendor(session, str(message.chat.id)):
         return await default_client_handler(message)
 
-    price_list = []
     try:
-        counts = [1, 7, 14, 30]
-        index = 0
-        data = message.text
-        days = data.split("\n")
-        if len(days) != 4:
-            raise
+        price_without_pin, price_with_pin = message.text.split("/", maxsplit=1)
+        if (int(price_without_pin) < 1 or int(price_without_pin) > 10000 or
+                int(price_with_pin) < 1 or int(price_with_pin) > 10000):
+            return await message.answer("Минимальная цена - 1, максимальная цена - 10000")
 
-        for day in days:
-            day_details = day.split(" - ")
-            count = int(day_details[0])
-            if count != counts[index]:
-                raise
+        await state.update_data(price_1=PriceView(int(price_without_pin), int(price_with_pin)))
 
-            prices = day_details[1].split("/")
-            price_without_pin = int(prices[0])
-            price_with_pin = int(prices[1])
-            price_list.append(PriceView(price_without_pin, price_with_pin))
-            index += 1
+    except Exception:
+        return await message.answer("Ошибка парсинга, попробуйте еще раз")
+
+    await message.answer("Отправьте мне стоимость за 1 неделю в формате:\n<b>цена без закрепа/цена с закрепом</b>\n\n"
+                         "Пример:\n<code>50/75</code>", parse_mode=ParseMode.HTML)
+    await state.set_state(GroupPriceList.price_7)
+
+
+@router.message(GroupPriceList.price_7, F.text.lower().contains("назад"))
+async def change_group_price_7_back_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    await message.answer("Отправьте мне стоимость за 1 день в формате:\n<b>цена без закрепа/цена с закрепом</b>\n\n"
+                         "Пример:\n<code>10/15</code>",
+                         parse_mode=ParseMode.HTML)
+    await state.set_state(GroupPriceList.price_1)
+
+
+@router.message(GroupPriceList.price_7, F.text)
+async def change_group_price_14_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    try:
+        price_without_pin, price_with_pin = message.text.split("/", maxsplit=1)
+        if (int(price_without_pin) < 1 or int(price_without_pin) > 10000 or
+                int(price_with_pin) < 1 or int(price_with_pin) > 10000):
+            return await message.answer("Минимальная цена - 1, максимальная цена - 10000")
+
+        await state.update_data(price_7=PriceView(int(price_without_pin), int(price_with_pin)))
+
+    except Exception:
+        return await message.answer("Ошибка парсинга, попробуйте еще раз")
+
+    await message.answer("Отправьте мне стоимость за 2 недели в формате:\n<b>цена без закрепа/цена с закрепом</b>\n\n"
+                         "Пример:\n<code>90/140</code>", parse_mode=ParseMode.HTML)
+    await state.set_state(GroupPriceList.price_14)
+
+
+@router.message(GroupPriceList.price_14, F.text.lower().contains("назад"))
+async def change_group_price_14_back_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    await message.answer("Отправьте мне стоимость за 1 неделю в формате:\n<b>цена без закрепа/цена с закрепом</b>\n\n"
+                         "Пример:\n<code>50/75</code>",
+                         parse_mode=ParseMode.HTML)
+    await state.set_state(GroupPriceList.price_7)
+
+
+@router.message(GroupPriceList.price_14, F.text)
+async def change_group_price_30_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    try:
+        price_without_pin, price_with_pin = message.text.split("/", maxsplit=1)
+        if (int(price_without_pin) < 1 or int(price_without_pin) > 10000 or
+                int(price_with_pin) < 1 or int(price_with_pin) > 10000):
+            return await message.answer("Минимальная цена - 1, максимальная цена - 10000")
+
+        await state.update_data(price_14=PriceView(int(price_without_pin), int(price_with_pin)))
+
+    except Exception:
+        return await message.answer("Ошибка парсинга, попробуйте еще раз")
+
+    await message.answer("Отправьте мне стоимость за 1 месяц в формате:\n<b>цена без закрепа/цена с закрепом</b>\n\n"
+                         "Пример:\n<code>170/270</code>", parse_mode=ParseMode.HTML)
+    await state.set_state(GroupPriceList.price_30)
+
+
+@router.message(GroupPriceList.price_30, F.text.lower().contains("назад"))
+async def change_group_price_30_back_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    await message.answer("Отправьте мне стоимость за 2 недели в формате:\n<b>цена без закрепа/цена с закрепом</b>\n\n"
+                         "Пример:\n<code>50/75</code>",
+                         parse_mode=ParseMode.HTML)
+    await state.set_state(GroupPriceList.price_14)
+
+
+@router.message(GroupPriceList.price_30, F.text)
+async def set_group_price_30_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    try:
+        price_without_pin, price_with_pin = message.text.split("/", maxsplit=1)
+        if (int(price_without_pin) < 1 or int(price_without_pin) > 10000 or
+                int(price_with_pin) < 1 or int(price_with_pin) > 10000):
+            return await message.answer("Минимальная цена - 1, максимальная цена - 10000")
+
+        await state.update_data(price_30=PriceView(int(price_without_pin), int(price_with_pin)))
 
     except Exception:
         return await message.answer("Ошибка парсинга, попробуйте еще раз")
@@ -634,10 +806,10 @@ async def set_group_price_list_handler(message: Message, session: AsyncSession, 
     try:
         client.update(Endpoint.GROUP, {
             "id": data["group_id"],
-            "priceForOneDay": price_list[0].to_dict(),
-            "priceForOneWeek": price_list[1].to_dict(),
-            "priceForTwoWeeks": price_list[2].to_dict(),
-            "priceForOneMonth": price_list[3].to_dict(),
+            "priceForOneDay": data.get("price_1").to_dict(),
+            "priceForOneWeek": data.get("price_7").to_dict(),
+            "priceForTwoWeeks": data.get("price_14").to_dict(),
+            "priceForOneMonth": data.get("price_30").to_dict()
         })
         await message.answer(
             text=await get_group_info(message, session, data["group_id"]),
@@ -1289,7 +1461,7 @@ async def statistic_group_handler(callback: CallbackQuery, callback_data: GroupC
                                           f"Заработано за месяц - {month}\n"
                                           f"Заработано за неделю - {week}\n"
                                           f"Процент покрытия закрытых объявлений - "
-                                          f"{int(posts_total_count*100/times_in_day)}%", parse_mode=ParseMode.HTML)
+                                          f"{int(posts_total_count * 100 / times_in_day)}%", parse_mode=ParseMode.HTML)
 
     await callback.message.answer("Главное меню", reply_markup=main_kb_by_role(callback.message))
     await state.clear()
