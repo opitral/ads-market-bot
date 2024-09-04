@@ -17,7 +17,7 @@ from api.views import UserView, PriceView, GroupView, PostView, PublicationView,
 from config_reader import config
 from database.orm_queries import is_vendor, find_user_by_telegram_id, add_user, add_group, get_user_groups, \
     get_group_by_telegram_id_and_user_telegram_id, delete_group, get_messages_count_last_7_days, add_post, \
-    get_total_price_last_days, get_total_price_all_time
+    get_total_price_last_days, get_total_price_all_time, get_group_by_telegram_id
 from filters.chat_type import ChatTypeFilter
 from handlers.client import default_client_handler
 from keyboards.admin import main_kb as admin_main_kb
@@ -1260,10 +1260,13 @@ async def create_post_submit_ok_handler(message: Message, session: AsyncSession,
                 publish_time=post.get('time')
             ).to_dict())
 
+        group = client.get_by_id(Endpoint.GROUP, post_info.get("group_id"))
+
     except Exception as ex:
         return await message.answer(str(ex))
 
-    await add_post(session, post_info.get('group_id'), post_info.get('total_price'))
+    group_local = await get_group_by_telegram_id(session, group.get("groupTelegramId"))
+    await add_post(session, group_local.id, post_info.get('total_price'))
     await message.answer("Объявление создано", reply_markup=main_kb_by_role(message))
     await state.clear()
 
