@@ -82,7 +82,8 @@ class CreatePost(StatesGroup):
     group = State()
     calendar = State()
     post = State()
-    button = State()
+    button_name = State()
+    button_url = State()
     submit = State()
 
 
@@ -450,8 +451,7 @@ async def get_group_info(message: Message, session: AsyncSession, group_id: int)
 
 
 @router.callback_query(MyGroups.group, GroupCbData.filter())
-async def my_groups_group_handler(callback: CallbackQuery, callback_data: GroupCbData, session: AsyncSession,
-                                  state: FSMContext):
+async def my_groups_group_handler(callback: CallbackQuery, callback_data: GroupCbData, session: AsyncSession):
     if not await is_vendor(session, str(callback.message.chat.id)):
         return await default_client_handler(callback.message)
 
@@ -533,8 +533,8 @@ async def change_group_posts_interval_handler(callback: CallbackQuery, callback_
         return await default_client_handler(callback.message)
 
     await callback.message.answer("Отправьте мне интервал между публикациями в минутах\n"
-                                  "*Значение должно быть кратным 30\n\n"
-                                  "**Максимальный интервал 5 часов"
+                                  "*Значение должно быть кратным 30\n"
+                                  "**Максимальный интервал 5 часов\n\n"
                                   "Пример:\n"
                                   "<code>30 = 30 минут\n60 = 1 час \n90 = 1.5 часа \n120 = 2 часа\n180 = 3 часа</code>",
                                   parse_mode=ParseMode.HTML, reply_markup=back_kb())
@@ -866,7 +866,7 @@ async def create_post_post_handler(message: Message, session: AsyncSession, stat
 
     await state.update_data(calendar=message.web_app_data.data)
     await message.answer("Отправьте мне публикацию, она может состоять из фото, видео, гиф или просто текста\n"
-                         "*Прмиум стикеры не отображаются, учитывайте это при создании объявления",
+                         "*Премиум стикеры не отображаются, учитывайте это при создании объявления",
                          reply_markup=back_kb())
 
     await state.set_state(CreatePost.post)
@@ -885,7 +885,7 @@ async def create_post_post_back_handler(message: Message, session: AsyncSession,
 
 @router.message(CreatePost.post,
                 F.content_type.in_([ContentType.TEXT, ContentType.PHOTO, ContentType.VIDEO, ContentType.ANIMATION]))
-async def create_post_button_handler(message: Message, session: AsyncSession, state: FSMContext):
+async def create_post_button_name_handler(message: Message, session: AsyncSession, state: FSMContext):
     if not await is_vendor(session, str(message.chat.id)):
         return await default_client_handler(message)
 
@@ -905,14 +905,24 @@ async def create_post_button_handler(message: Message, session: AsyncSession, st
         await state.update_data(publication_type=PublicationType.TEXT,
                                 file_id=None, text=message.html_text)
 
-    await message.answer("Отправьте мне кнопку в формате:\n<b>текст кнопки | [ссылка]</b>\n\n"
-                         "Пример:\n<code>Перейти | https://www.google.com/</code>",
+    await message.answer("Отправьте мне текст кнопки",
                          reply_markup=skip_kb(), parse_mode=ParseMode.HTML)
-    await state.set_state(CreatePost.button)
+    await state.set_state(CreatePost.button_name)
 
 
-@router.message(CreatePost.button, F.text.lower().contains("назад"))
-async def create_post_button_back_handler(message: Message, session: AsyncSession, state: FSMContext):
+@router.message(CreatePost.submit, F.text.lower().contains("назад"))
+@router.message(CreatePost.button_url, F.text.lower().contains("назад"))
+async def create_post_submit_back_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    await message.answer("Отправьте мне текст кнопки",
+                         reply_markup=skip_kb(), parse_mode=ParseMode.HTML)
+    await state.set_state(CreatePost.button_name)
+
+
+@router.message(CreatePost.button_name, F.text.lower().contains("назад"))
+async def create_post_button_name_back_handler(message: Message, session: AsyncSession, state: FSMContext):
     if not await is_vendor(session, str(message.chat.id)):
         return await default_client_handler(message)
 
@@ -957,8 +967,8 @@ def get_post_info(data):
     }
 
 
-@router.message(CreatePost.button, F.text.lower().contains("пропустить"))
-async def create_post_skip_handler(message: Message, session: AsyncSession, state: FSMContext):
+@router.message(CreatePost.button_name, F.text.lower().contains("пропустить"))
+async def create_post_button_skip_handler(message: Message, session: AsyncSession, state: FSMContext):
     if not await is_vendor(session, str(message.chat.id)):
         return await default_client_handler(message)
 
@@ -1018,35 +1028,35 @@ def is_valid_url(url):
     return all([parsed_url.scheme, parsed_url.netloc])
 
 
-@router.message(CreatePost.button, F.text)
-async def create_post_button_valid_handler(message: Message, session: AsyncSession, state: FSMContext):
+@router.message(CreatePost.button_name, F.text)
+async def create_post_button_name_handler(message: Message, session: AsyncSession, state: FSMContext):
     if not await is_vendor(session, str(message.chat.id)):
         return await default_client_handler(message)
 
-    try:
-        button = message.text
-        text, url = button.split(" | ")
-        if url.startswith("@"):
-            url = "https://t.me/" + url[1:]
-        if not is_valid_url(url):
-            return await message.answer("Некорректная ссылка, попробуйте еще раз")
+    if len(message.text) > 30:
+        return await message.answer("Название кнопки должно содержать не более 30 символов")
 
-    except Exception:
-        return await message.answer("Ошибка во время парсинга, попробуйте еще раз")
+    await message.answer("Отправьте мне ссылку для кнопки", reply_markup=back_kb())
 
-    await state.update_data(button_text=text, button_url=url)
-    await create_post_skip_handler(message, session, state)
+    await state.update_data(button_text=message.text)
+    await state.set_state(CreatePost.button_url)
 
 
-@router.message(CreatePost.submit, F.text.lower().contains("назад"))
-async def create_post_submit_back_handler(message: Message, session: AsyncSession, state: FSMContext):
+@router.message(CreatePost.button_url, F.text)
+async def create_post_button_url_handler(message: Message, session: AsyncSession, state: FSMContext):
     if not await is_vendor(session, str(message.chat.id)):
         return await default_client_handler(message)
 
-    await message.answer("Отправьте мне кнопку в формате:\n<b>текст кнопки | [ссылка]</b>\n\n"
-                         "Пример:\n<code>Перейти | [https://www.google.com/]</code>",
-                         reply_markup=skip_kb(), parse_mode=ParseMode.HTML)
-    await state.set_state(CreatePost.button)
+    url = message.text
+
+    if url.startswith("@"):
+        url = "https://t.me/" + url[1:]
+
+    if not is_valid_url(url):
+        return await message.answer("Некорректная ссылка, попробуйте еще раз")
+
+    await state.update_data(button_url=url)
+    await create_post_button_skip_handler(message, session, state)
 
 
 @router.message(CreatePost.submit, F.text.lower().contains("подтвердить"))

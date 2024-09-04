@@ -152,7 +152,7 @@ def skip_kb() -> ReplyKeyboardMarkup:
 
 
 def publication_kb(button) -> InlineKeyboardMarkup:
-    if button.get("text"):
+    if button.get("text") and button.get("url"):
         kb = InlineKeyboardBuilder()
         kb.row(InlineKeyboardButton(text=button.get("text"), url=button.get("url")))
         return kb.as_markup()
