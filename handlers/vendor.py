@@ -550,7 +550,7 @@ async def my_groups_group_handler(callback: CallbackQuery, callback_data: GroupC
             parse_mode=ParseMode.HTML,
             reply_markup=group_kb(callback_data.group_id)
         )
-        await callback.message.answer(f"id: {callback_data.group_id}", reply_markup=to_main_menu_kb())
+        await callback.message.answer("👨‍💻", reply_markup=to_main_menu_kb())
 
     except TelegramAPIError:
         return await callback.answer("Бот не является участником группы")
