@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timedelta
 from urllib.parse import urlparse
 
-from aiogram import Router, F
+from aiogram import Router, F, Bot
 from aiogram.enums import ParseMode, ContentType
 from aiogram.exceptions import TelegramAPIError
 from aiogram.filters import Command
@@ -12,7 +12,7 @@ from aiogram.types import Message, CallbackQuery
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.client import ApiClient
-from api.enums import Endpoint, PublicationType
+from api.enums import Endpoint, PublicationType, PostStatus
 from api.views import UserView, PriceView, GroupView, PostView, PublicationView, ButtonView
 from config_reader import config
 from database.orm_queries import is_vendor, find_user_by_telegram_id, add_user, add_group, get_user_groups, \
@@ -48,7 +48,11 @@ async def command_start_handler(message: Message, session: AsyncSession):
     if not await is_vendor(session, str(message.chat.id)):
         return await default_client_handler(message)
 
-    await message.answer("👋 Здравствуйте", reply_markup=main_kb())
+    await message.answer('👋 Приветствуем, администратор!\n\nВы сделали отличный выбор, воспользовавшись функционалом '
+                         'ChatMallBot для упрощения своей работы! ⚙️💼  \nТеперь управление группами станет ещё '
+                         'легче. Ознакомьтесь с возможностями бота по ссылке и используйте его на полную мощность! 🚀 '
+                         ' \n\n🔗 https://teletype.in/@chatmallbot/FAQADMIN\n\nУдачи в вашей работе! 💡',
+                         reply_markup=main_kb(), disable_web_page_preview=True)
 
 
 class AddGroup(StatesGroup):
@@ -1001,7 +1005,9 @@ async def create_post_calendar_handler(callback: CallbackQuery, callback_data: G
         return await default_client_handler(callback.message)
 
     await state.update_data(group_id=callback_data.group_id)
-    await callback.message.answer("Откройте календарь и выберите нужные даты/время",
+    await callback.message.answer("Откройте календарь и выберите нужные даты/время\n\n"
+                                  "Или же отправьте ссылку объявления с канала, которое вы хотите скопировать в "
+                                  "другой чат",
                                   reply_markup=calendar_kb(callback_data.group_id))
     await state.set_state(CreatePost.calendar)
 
@@ -1044,13 +1050,62 @@ async def create_post_post_handler(message: Message, session: AsyncSession, stat
     await state.set_state(CreatePost.post)
 
 
+@router.message(CreatePost.calendar, F.content_type == ContentType.TEXT)
+async def create_post_by_link_handler(message: Message, session: AsyncSession, state: FSMContext):
+    if not await is_vendor(session, str(message.chat.id)):
+        return await default_client_handler(message)
+
+    try:
+        messageId = int(message.text.split("/")[-1])
+
+    except Exception:
+        return await message.answer("Ошибка парсинга, попробуйте еще раз")
+
+    try:
+        found_user = await find_user_by_telegram_id(session, str(message.chat.id))
+        client = ApiClient(found_user)
+        posts = client.get_all(Endpoint.POST, {"messageId": messageId}).get("responseList")
+        if not posts:
+            return await message.answer("Публикация не найдена")
+
+        post_publication = posts[0].get("publication")
+        publication = {
+            "type": post_publication.get("type"),
+            "fileId": post_publication.get("fileId"),
+            "text": post_publication.get("text"),
+            "button": ButtonView(
+                post_publication.get("button").get("name"),
+                post_publication.get("button").get("url")
+            ).to_dict()
+        }
+
+        state_data = await state.get_data()
+        for post in posts:
+            client.create(Endpoint.POST, {
+                "publication": publication,
+                "groupId": state_data["group_id"],
+                "withPin": post.get('withPin'),
+                "publishDate": post.get('publishDate'),
+                "publishTime": post.get('publishTime'),
+                "status": PostStatus.AWAITS.value,
+                "messageId": messageId
+            })
+
+        await message.answer("Публикация создана", reply_markup=main_kb_by_role(message))
+        await state.clear()
+
+    except Exception as ex:
+        return await message.answer(str(ex))
+
+
 @router.message(CreatePost.post, F.text.lower().contains("назад"))
 async def create_post_post_back_handler(message: Message, session: AsyncSession, state: FSMContext):
     if not await is_vendor(session, str(message.chat.id)):
         return await default_client_handler(message)
 
     data = await state.get_data()
-    await message.answer("Откройте календарь и выберите нужные даты/время",
+    await message.answer("Откройте календарь и выберите нужные даты/время\n\n"
+                         "Или же отправьте ссылку объявления с канала, которое вы хотите скопировать в другой чат",
                          reply_markup=calendar_kb(data["group_id"]))
     await state.set_state(CreatePost.calendar)
 
@@ -1107,14 +1162,14 @@ def get_publication_info(data):
     publication_type = data["publication_type"]
     file_id = data["file_id"]
     text = data["text"]
-    button_text, button_url = data.get("button_text"), data.get("button_url")
+    button_name, button_url = data.get("button_name"), data.get("button_url")
 
     return {
         "publication_type": publication_type,
         "text": text,
         "file_id": file_id,
         "button": {
-            "text": button_text,
+            "name": button_name,
             "url": button_url
         }
     }
@@ -1210,7 +1265,7 @@ async def create_post_button_name_handler(message: Message, session: AsyncSessio
 
     await message.answer("Отправьте мне ссылку для кнопки", reply_markup=back_kb())
 
-    await state.update_data(button_text=message.text)
+    await state.update_data(button_name=message.text)
     await state.set_state(CreatePost.button_url)
 
 
@@ -1224,11 +1279,45 @@ async def create_post_button_url_handler(message: Message, session: AsyncSession
     if url.startswith("@"):
         url = "https://t.me/" + url[1:]
 
+    if not url.startswith("https://"):
+        url = "https://" + url
+
     if not is_valid_url(url):
         return await message.answer("Некорректная ссылка, попробуйте еще раз")
 
     await state.update_data(button_url=url)
     await create_post_button_skip_handler(message, session, state)
+
+
+async def publish_to_general_group(bot: Bot, publication):
+    publication_type = publication.get("publication_type")
+    publication_file_id = publication.get("fileId")
+    publication_text = publication.get("text")
+    button = publication.get("button")
+
+    if publication_type == PublicationType.TEXT:
+        message = await bot.send_message(config.GENERAL_CHANNEL_TELEGRAM_ID, publication_text,
+                                         reply_markup=publication_kb(button),
+                                         parse_mode="HTML")
+
+    elif publication_type == PublicationType.PHOTO:
+        message = await bot.send_photo(config.GENERAL_CHANNEL_TELEGRAM_ID, photo=publication_file_id,
+                                       caption=publication_text, reply_markup=publication_kb(button), parse_mode="HTML")
+
+    elif publication_type == PublicationType.VIDEO:
+        message = await bot.send_video(config.GENERAL_CHANNEL_TELEGRAM_ID, video=publication_file_id,
+                                       caption=publication_text, reply_markup=publication_kb(button), parse_mode="HTML")
+
+    elif publication_type == PublicationType.ANIMATION:
+        message = await bot.send_animation(config.GENERAL_CHANNEL_TELEGRAM_ID, animation=publication_file_id,
+                                           caption=publication_text, reply_markup=publication_kb(button),
+                                           parse_mode="HTML")
+
+    else:
+        error = f"Unknown publication type: {publication_type}"
+        raise ValueError(error)
+
+    return message.message_id
 
 
 @router.message(CreatePost.submit, F.text.lower().contains("подтвердить"))
@@ -1246,10 +1335,12 @@ async def create_post_submit_ok_handler(message: Message, session: AsyncSession,
         file_id=publication_info.get('file_id'),
         text=publication_info.get('text'),
         button=ButtonView(
-            name=publication_info.get('button').get('text'),
+            name=publication_info.get('button').get('name'),
             url=publication_info.get('button').get('url'),
         )
     )
+    message_id = await publish_to_general_group(message.bot, publication_info)
+
     try:
         for post in post_info.get("posts"):
             client.create(Endpoint.POST, PostView(
@@ -1257,7 +1348,8 @@ async def create_post_submit_ok_handler(message: Message, session: AsyncSession,
                 group_id=post_info.get('group_id'),
                 with_pin=post.get('with_pin'),
                 publish_date=post.get('date'),
-                publish_time=post.get('time')
+                publish_time=post.get('time'),
+                message_id=message_id
             ).to_dict())
 
         group = client.get_by_id(Endpoint.GROUP, post_info.get("group_id"))
@@ -1267,7 +1359,7 @@ async def create_post_submit_ok_handler(message: Message, session: AsyncSession,
 
     group_local = await get_group_by_telegram_id(session, group.get("groupTelegramId"))
     await add_post(session, group_local.id, post_info.get('total_price'))
-    await message.answer("Объявление создано", reply_markup=main_kb_by_role(message))
+    await message.answer("Публикация создана", reply_markup=main_kb_by_role(message))
     await state.clear()
 
 
@@ -1475,7 +1567,7 @@ async def unknown_handler(message: Message, session: AsyncSession):
     if not await is_vendor(session, str(message.chat.id)):
         return await default_client_handler(message)
 
-    await message.answer("Неизвестная команда", reply_markup=main_kb_by_role(message))
+    await message.answer("🤖 Поскорее бы создать новое обьявление...", reply_markup=main_kb_by_role(message))
 
 
 @router.callback_query()

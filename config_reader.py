@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     DEFAULT_CLIENT_MESSAGE: str
     PAGE_LIMIT: int = 10
     CALENDAR_URL: str
+    GENERAL_CHANNEL_TELEGRAM_ID: str
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

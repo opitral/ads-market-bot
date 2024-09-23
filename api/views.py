@@ -127,7 +127,7 @@ class PublicationView:
 
 class PostView:
     def __init__(self, publication: PublicationView, group_id: int, with_pin: bool,
-                 publish_date: datetime.date, publish_time: datetime.time,
+                 publish_date: datetime.date, publish_time: datetime.time, message_id: int,
                  _id: int = None, status: PostStatus = PostStatus.AWAITS):
         self.id = _id
         self.publication = publication
@@ -136,6 +136,7 @@ class PostView:
         self.publish_date = publish_date
         self.publish_time = publish_time
         self.status = status
+        self.message_id = message_id
 
     def to_dict(self):
         return {
@@ -145,5 +146,6 @@ class PostView:
             "withPin": self.with_pin,
             "publishDate": self.publish_date.strftime("%Y-%m-%d"),
             "publishTime": self.publish_time.strftime("%H:%M"),
-            "status": self.status.value
+            "status": self.status.value,
+            "messageId": self.message_id
         }
