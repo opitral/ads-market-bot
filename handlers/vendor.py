@@ -1291,7 +1291,7 @@ async def create_post_button_url_handler(message: Message, session: AsyncSession
 
 async def publish_to_general_group(bot: Bot, publication):
     publication_type = publication.get("publication_type")
-    publication_file_id = publication.get("fileId")
+    publication_file_id = publication.get("file_id")
     publication_text = publication.get("text")
     button = publication.get("button")
 
@@ -1301,6 +1301,7 @@ async def publish_to_general_group(bot: Bot, publication):
                                          parse_mode="HTML")
 
     elif publication_type == PublicationType.PHOTO:
+        print(publication_file_id)
         message = await bot.send_photo(config.GENERAL_CHANNEL_TELEGRAM_ID, photo=publication_file_id,
                                        caption=publication_text, reply_markup=publication_kb(button), parse_mode="HTML")
 
