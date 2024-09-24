@@ -1061,41 +1061,46 @@ async def create_post_by_link_handler(message: Message, session: AsyncSession, s
     except Exception:
         return await message.answer("Ошибка парсинга, попробуйте еще раз")
 
-    try:
-        found_user = await find_user_by_telegram_id(session, str(message.chat.id))
-        client = ApiClient(found_user)
-        posts = client.get_all(Endpoint.POST, {"messageId": messageId}).get("responseList")
-        if not posts:
-            return await message.answer("Публикация не найдена")
+    # try:
+    found_user = await find_user_by_telegram_id(session, str(message.chat.id))
+    client = ApiClient(found_user)
+    posts = client.get_all(Endpoint.POST, {"messageId": messageId}).get("responseList")
+    if not posts:
+        return await message.answer("Публикация не найдена")
 
-        post_publication = posts[0].get("publication")
-        publication = {
-            "type": post_publication.get("type"),
-            "fileId": post_publication.get("fileId"),
-            "text": post_publication.get("text"),
-            "button": ButtonView(
-                post_publication.get("button").get("name"),
-                post_publication.get("button").get("url")
-            ).to_dict()
-        }
+    post_publication = posts[0].get("publication")
+    post_button = post_publication.get("button")
+    button = None
+    if post_button:
+        button = ButtonView(
+            post_button.get("name"),
+            post_button.get("url")
+        ).to_dict()
 
-        state_data = await state.get_data()
-        for post in posts:
-            client.create(Endpoint.POST, {
-                "publication": publication,
-                "groupId": state_data["group_id"],
-                "withPin": post.get('withPin'),
-                "publishDate": post.get('publishDate'),
-                "publishTime": post.get('publishTime'),
-                "status": PostStatus.AWAITS.value,
-                "messageId": messageId
-            })
+    publication = {
+        "type": post_publication.get("type"),
+        "fileId": post_publication.get("fileId"),
+        "text": post_publication.get("text"),
+        "button": button
+    }
 
-        await message.answer("Публикация создана", reply_markup=main_kb_by_role(message))
-        await state.clear()
+    state_data = await state.get_data()
+    for post in posts:
+        client.create(Endpoint.POST, {
+            "publication": publication,
+            "groupId": state_data["group_id"],
+            "withPin": post.get('withPin'),
+            "publishDate": post.get('publishDate'),
+            "publishTime": post.get('publishTime'),
+            "status": PostStatus.AWAITS.value,
+            "messageId": messageId
+        })
 
-    except Exception as ex:
-        return await message.answer(str(ex))
+    await message.answer("Публикация создана", reply_markup=main_kb_by_role(message))
+    await state.clear()
+
+    # except Exception as ex:
+    #     return await message.answer(str(ex))
 
 
 @router.message(CreatePost.post, F.text.lower().contains("назад"))
@@ -1301,7 +1306,6 @@ async def publish_to_general_group(bot: Bot, publication):
                                          parse_mode="HTML")
 
     elif publication_type == PublicationType.PHOTO:
-        print(publication_file_id)
         message = await bot.send_photo(config.GENERAL_CHANNEL_TELEGRAM_ID, photo=publication_file_id,
                                        caption=publication_text, reply_markup=publication_kb(button), parse_mode="HTML")
 
