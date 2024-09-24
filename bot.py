@@ -34,7 +34,7 @@ async def main():
     logging.basicConfig(level=logging.INFO)
 
     file_handler = logging.FileHandler("bot.log")
-    file_handler.setLevel(logging.WARNING)
+    file_handler.setLevel(logging.INFO)
 
     formatter = logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
     file_handler.setFormatter(formatter)
