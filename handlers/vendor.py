@@ -1085,16 +1085,24 @@ async def create_post_by_link_handler(message: Message, session: AsyncSession, s
         }
 
         state_data = await state.get_data()
+        publishDateTimes = {}
         for post in posts:
-            client.create(Endpoint.POST, {
-                "publication": publication,
-                "groupId": state_data["group_id"],
-                "withPin": post.get('withPin'),
-                "publishDate": post.get('publishDate'),
-                "publishTime": post.get('publishTime'),
-                "status": PostStatus.AWAITS.value,
-                "messageId": messageId
-            })
+            publishDate = post.get('publishDate')
+            publishTime = post.get('publishTime')
+            if publishDateTimes.get(publishDate) is None:
+                publishDateTimes[publishDate] = []
+
+            if publishTime not in publishDateTimes[publishDate]:
+                client.create(Endpoint.POST, {
+                    "publication": publication,
+                    "groupId": state_data["group_id"],
+                    "withPin": post.get('withPin'),
+                    "publishDate": publishDate,
+                    "publishTime": publishTime,
+                    "status": PostStatus.AWAITS.value,
+                    "messageId": messageId
+                })
+                publishDateTimes[publishDate].append(publishTime)
 
         await message.answer("Публикация создана", reply_markup=main_kb_by_role(message))
         await state.clear()
