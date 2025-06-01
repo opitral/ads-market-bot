@@ -104,7 +104,7 @@ async def make_pagination_handler(callback: CallbackQuery, callback_data: Pagina
         with suppress(TelegramBadRequest):
             await callback.message.edit_text(
                 f"Всего пользователей: {len(users)}",
-                reply_markup=await all_users_kb(users, page=page))
+                reply_markup=all_users_kb(users, page=page))
 
     else:
         await callback.message.edit_text("Пользователей не найдено")
